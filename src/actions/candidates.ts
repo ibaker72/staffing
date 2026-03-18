@@ -8,27 +8,43 @@ import {
 import { revalidatePath } from "next/cache";
 import type { Candidate, CandidateStatus } from "@/types/database";
 
-export async function getCandidates() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("candidates")
-    .select("*")
-    .order("created_at", { ascending: false });
+export async function getCandidates(): Promise<Candidate[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data as Candidate[];
+    if (error) {
+      console.error("[getCandidates] Supabase error:", error.message, error.code);
+      return [];
+    }
+    return (data ?? []) as Candidate[];
+  } catch (e) {
+    console.error("[getCandidates] Unexpected error:", e);
+    return [];
+  }
 }
 
-export async function getCandidate(id: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("candidates")
-    .select("*")
-    .eq("id", id)
-    .single();
+export async function getCandidate(id: string): Promise<Candidate | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data as Candidate;
+    if (error) {
+      console.error("[getCandidate] Supabase error:", error.message, error.code);
+      return null;
+    }
+    return data as Candidate | null;
+  } catch (e) {
+    console.error("[getCandidate] Unexpected error:", e);
+    return null;
+  }
 }
 
 export async function createCandidate(formData: FormData) {
@@ -49,7 +65,10 @@ export async function createCandidate(formData: FormData) {
     status: "new" as CandidateStatus,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error("[createCandidate] Supabase error:", error.message);
+    throw new Error("Failed to create candidate. Please try again.");
+  }
   revalidatePath("/candidates");
   revalidatePath("/dashboard");
 }
@@ -62,7 +81,10 @@ export async function updateCandidateStatus(id: string, status: CandidateStatus)
     .update({ status })
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[updateCandidateStatus] Supabase error:", error.message);
+    throw new Error("Failed to update status. Please try again.");
+  }
   revalidatePath("/candidates");
   revalidatePath(`/candidates/${id}`);
 }
@@ -87,12 +109,15 @@ export async function updateCandidate(id: string, formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[updateCandidate] Supabase error:", error.message);
+    throw new Error("Failed to update candidate. Please try again.");
+  }
   revalidatePath("/candidates");
   revalidatePath(`/candidates/${id}`);
 }
 
-export async function getCandidateCount() {
+export async function getCandidateCount(): Promise<number> {
   const result = await getCandidateCountMetric();
   return result.value;
 }

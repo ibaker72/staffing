@@ -8,21 +8,35 @@ import {
 import { revalidatePath } from "next/cache";
 import type { Placement, PlacementStatus } from "@/types/database";
 
-export async function getPlacements() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("placements")
-    .select(
-      "*, candidate:candidates(id, full_name), job:jobs(id, title), company:companies(id, name)"
-    )
-    .order("created_at", { ascending: false });
+export type PlacementWithRelations = Placement & {
+  candidate: { id: string; full_name: string } | null;
+  job: { id: string; title: string } | null;
+  company: { id: string; name: string } | null;
+};
 
-  if (error) throw error;
-  return data as (Placement & {
-    candidate: { id: string; full_name: string };
-    job: { id: string; title: string };
-    company: { id: string; name: string };
-  })[];
+export type PlacementWithCandidate = Placement & {
+  candidate: { id: string; full_name: string; email: string | null; status: string } | null;
+};
+
+export async function getPlacements(): Promise<PlacementWithRelations[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("placements")
+      .select(
+        "*, candidate:candidates(id, full_name), job:jobs(id, title), company:companies(id, name)"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[getPlacements] Supabase error:", error.message, error.code);
+      return [];
+    }
+    return (data ?? []) as PlacementWithRelations[];
+  } catch (e) {
+    console.error("[getPlacements] Unexpected error:", e);
+    return [];
+  }
 }
 
 export async function createPlacement(formData: FormData) {
@@ -37,7 +51,10 @@ export async function createPlacement(formData: FormData) {
     placement_fee: fee,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error("[createPlacement] Supabase error:", error.message);
+    throw new Error("Failed to create placement. Please try again.");
+  }
   revalidatePath("/placements");
   revalidatePath("/dashboard");
 }
@@ -50,12 +67,15 @@ export async function updatePlacementStatus(id: string, status: PlacementStatus)
     .update({ status })
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[updatePlacementStatus] Supabase error:", error.message);
+    throw new Error("Failed to update placement status. Please try again.");
+  }
   revalidatePath("/placements");
   revalidatePath("/dashboard");
 }
 
-export async function getTotalRevenue() {
+export async function getTotalRevenue(): Promise<number> {
   const result = await getTotalRevenueMetric();
   return result.value;
 }
@@ -77,18 +97,24 @@ export async function getTotalRevenueMetric(): Promise<MetricQueryResult> {
   });
 }
 
-export async function getPlacementsByJob(jobId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("placements")
-    .select(
-      "*, candidate:candidates(id, full_name, email, status)"
-    )
-    .eq("job_id", jobId)
-    .order("created_at", { ascending: false });
+export async function getPlacementsByJob(jobId: string): Promise<PlacementWithCandidate[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("placements")
+      .select(
+        "*, candidate:candidates(id, full_name, email, status)"
+      )
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data as (Placement & {
-    candidate: { id: string; full_name: string; email: string | null; status: string };
-  })[];
+    if (error) {
+      console.error("[getPlacementsByJob] Supabase error:", error.message);
+      return [];
+    }
+    return (data ?? []) as PlacementWithCandidate[];
+  } catch (e) {
+    console.error("[getPlacementsByJob] Unexpected error:", e);
+    return [];
+  }
 }

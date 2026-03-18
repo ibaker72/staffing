@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
+import { NotFoundState } from "@/components/ui/error-state";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
@@ -13,14 +14,29 @@ export default async function JobDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [job, placements] = await Promise.all([
-    getJob(id),
-    getPlacementsByJob(id),
-  ]);
+  const job = await getJob(id);
+
+  if (!job) {
+    return (
+      <>
+        <PageHeader title="Job" />
+        <NotFoundState
+          title="Job not found"
+          description="This job doesn't exist or couldn't be loaded."
+          backHref="/jobs"
+          backLabel="Back to Jobs"
+        />
+      </>
+    );
+  }
+
+  const placements = await getPlacementsByJob(id);
+
+  const currentStatus = job.status;
 
   async function toggleStatus() {
     "use server";
-    const newStatus = job.status === "open" ? "closed" : "open";
+    const newStatus = currentStatus === "open" ? "closed" : "open";
     await updateJobStatus(id, newStatus);
     revalidatePath(`/jobs/${id}`);
   }
@@ -29,7 +45,7 @@ export default async function JobDetailPage({
     <>
       <PageHeader
         title={job.title}
-        description={job.company?.name}
+        description={job.company?.name ?? undefined}
         action={
           <div className="flex gap-2">
             <LinkButton
@@ -76,7 +92,7 @@ export default async function JobDetailPage({
               <dt className="text-zinc-500">Company</dt>
               <dd>
                 <Link href={`/companies/${job.company_id}`} className="text-zinc-900 underline">
-                  {job.company?.name}
+                  {job.company?.name ?? "Unknown"}
                 </Link>
               </dd>
             </div>
@@ -121,9 +137,9 @@ export default async function JobDetailPage({
                         href={`/candidates/${p.candidate_id}`}
                         className="font-medium text-zinc-900 hover:underline"
                       >
-                        {p.candidate.full_name}
+                        {p.candidate?.full_name ?? "Unknown Candidate"}
                       </Link>
-                      {p.candidate.email && (
+                      {p.candidate?.email && (
                         <p className="text-xs text-zinc-500">{p.candidate.email}</p>
                       )}
                     </div>

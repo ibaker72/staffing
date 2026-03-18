@@ -8,27 +8,45 @@ import {
 import { revalidatePath } from "next/cache";
 import type { Job } from "@/types/database";
 
-export async function getJobs() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*, company:companies(id, name)")
-    .order("created_at", { ascending: false });
+export type JobWithCompany = Job & { company: { id: string; name: string } | null };
 
-  if (error) throw error;
-  return data as (Job & { company: { id: string; name: string } })[];
+export async function getJobs(): Promise<JobWithCompany[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*, company:companies(id, name)")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[getJobs] Supabase error:", error.message, error.code);
+      return [];
+    }
+    return (data ?? []) as JobWithCompany[];
+  } catch (e) {
+    console.error("[getJobs] Unexpected error:", e);
+    return [];
+  }
 }
 
-export async function getJob(id: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*, company:companies(*)")
-    .eq("id", id)
-    .single();
+export async function getJob(id: string): Promise<JobWithCompany | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*, company:companies(id, name)")
+      .eq("id", id)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data as Job & { company: { id: string; name: string } };
+    if (error) {
+      console.error("[getJob] Supabase error:", error.message, error.code);
+      return null;
+    }
+    return data as JobWithCompany | null;
+  } catch (e) {
+    console.error("[getJob] Unexpected error:", e);
+    return null;
+  }
 }
 
 export async function createJob(formData: FormData) {
@@ -42,7 +60,10 @@ export async function createJob(formData: FormData) {
     salary_range: (formData.get("salary_range") as string) || null,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error("[createJob] Supabase error:", error.message);
+    throw new Error("Failed to create job. Please try again.");
+  }
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
 }
@@ -55,13 +76,16 @@ export async function updateJobStatus(id: string, status: "open" | "closed") {
     .update({ status })
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    console.error("[updateJobStatus] Supabase error:", error.message);
+    throw new Error("Failed to update job status. Please try again.");
+  }
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${id}`);
   revalidatePath("/dashboard");
 }
 
-export async function getOpenJobCount() {
+export async function getOpenJobCount(): Promise<number> {
   const result = await getOpenJobCountMetric();
   return result.value;
 }
@@ -79,14 +103,22 @@ export async function getOpenJobCountMetric(): Promise<MetricQueryResult> {
   });
 }
 
-export async function getJobsByCompany(companyId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("jobs")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
+export async function getJobsByCompany(companyId: string): Promise<Job[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data as Job[];
+    if (error) {
+      console.error("[getJobsByCompany] Supabase error:", error.message);
+      return [];
+    }
+    return (data ?? []) as Job[];
+  } catch (e) {
+    console.error("[getJobsByCompany] Unexpected error:", e);
+    return [];
+  }
 }
