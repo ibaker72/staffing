@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Textarea, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -104,6 +104,18 @@ export default async function NewPlacementPage({
               step="0.01"
               min="0"
               placeholder="15000.00"
+            />
+            <Input
+              label="Start Date"
+              id="start_date"
+              name="start_date"
+              type="date"
+            />
+            <Textarea
+              label="Notes"
+              id="notes"
+              name="notes"
+              placeholder="Any notes about this placement..."
             />
             <div className="flex gap-3 pt-2">
               <Button type="submit">Create Placement</Button>

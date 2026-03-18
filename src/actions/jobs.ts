@@ -6,17 +6,41 @@ import {
   safeMetricQuery,
 } from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
-import type { Job } from "@/types/database";
+import type { Job, JobStatus, JobPriority, EmploymentType, PayType } from "@/types/database";
 
 export type JobWithCompany = Job & { company: { id: string; name: string } | null };
 
-export async function getJobs(): Promise<JobWithCompany[]> {
+export interface JobFilters {
+  search?: string;
+  status?: JobStatus | "";
+  priority?: JobPriority | "";
+  sort?: string;
+}
+
+export async function getJobs(filters?: JobFilters): Promise<JobWithCompany[]> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("jobs")
-      .select("*, company:companies(id, name)")
-      .order("created_at", { ascending: false });
+      .select("*, company:companies(id, name)");
+
+    if (filters?.search) {
+      query = query.or(
+        `title.ilike.%${filters.search}%,location.ilike.%${filters.search}%`
+      );
+    }
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+    if (filters?.priority) {
+      query = query.eq("priority", filters.priority);
+    }
+
+    const sortField = filters?.sort || "created_at";
+    const ascending = sortField === "title";
+    query = query.order(sortField, { ascending });
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("[getJobs] Supabase error:", error.message, error.code);
@@ -58,6 +82,10 @@ export async function createJob(formData: FormData) {
     description: (formData.get("description") as string) || null,
     location: (formData.get("location") as string) || null,
     salary_range: (formData.get("salary_range") as string) || null,
+    priority: (formData.get("priority") as JobPriority) || "medium",
+    urgency_notes: (formData.get("urgency_notes") as string) || null,
+    employment_type: (formData.get("employment_type") as EmploymentType) || "full_time",
+    pay_type: (formData.get("pay_type") as PayType) || "salary",
   });
 
   if (error) {
@@ -68,7 +96,7 @@ export async function createJob(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function updateJobStatus(id: string, status: "open" | "closed") {
+export async function updateJobStatus(id: string, status: JobStatus) {
   const supabase = await createClient();
 
   const { error } = await supabase

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge, Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
+import { ResumeUpload } from "@/components/resume-upload";
 import { revalidatePath } from "next/cache";
 import type { CandidateStatus } from "@/types/database";
 
@@ -41,6 +42,10 @@ export default async function CandidateDetailPage({
   }
 
   const skills = candidate.skills ?? [];
+  const formatSalary = (val: number | null) =>
+    val != null
+      ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(val)
+      : null;
 
   return (
     <>
@@ -50,35 +55,63 @@ export default async function CandidateDetailPage({
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <h3 className="text-sm font-semibold text-zinc-900 mb-4">Details</h3>
-          <dl className="space-y-3 text-sm">
-            <div>
-              <dt className="text-zinc-500">Status</dt>
-              <dd className="mt-1">
-                <StatusBadge status={candidate.status} />
-              </dd>
-            </div>
-            {candidate.email && (
+        <div className="lg:col-span-1 space-y-6">
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-4">Details</h3>
+            <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-zinc-500">Email</dt>
-                <dd className="text-zinc-900">{candidate.email}</dd>
+                <dt className="text-zinc-500">Status</dt>
+                <dd className="mt-1">
+                  <StatusBadge status={candidate.status} />
+                </dd>
               </div>
-            )}
-            {candidate.phone && (
+              {candidate.email && (
+                <div>
+                  <dt className="text-zinc-500">Email</dt>
+                  <dd className="text-zinc-900">{candidate.email}</dd>
+                </div>
+              )}
+              {candidate.phone && (
+                <div>
+                  <dt className="text-zinc-500">Phone</dt>
+                  <dd className="text-zinc-900">{candidate.phone}</dd>
+                </div>
+              )}
+              {candidate.source && (
+                <div>
+                  <dt className="text-zinc-500">Source</dt>
+                  <dd className="text-zinc-900 capitalize">{candidate.source.replace("_", " ")}</dd>
+                </div>
+              )}
+              {candidate.years_experience != null && (
+                <div>
+                  <dt className="text-zinc-500">Experience</dt>
+                  <dd className="text-zinc-900">{candidate.years_experience} years</dd>
+                </div>
+              )}
+              {candidate.desired_salary != null && (
+                <div>
+                  <dt className="text-zinc-500">Desired Salary</dt>
+                  <dd className="text-zinc-900">{formatSalary(candidate.desired_salary)}</dd>
+                </div>
+              )}
+              {candidate.last_contacted_at && (
+                <div>
+                  <dt className="text-zinc-500">Last Contacted</dt>
+                  <dd className="text-zinc-900">
+                    {new Date(candidate.last_contacted_at).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
               <div>
-                <dt className="text-zinc-500">Phone</dt>
-                <dd className="text-zinc-900">{candidate.phone}</dd>
+                <dt className="text-zinc-500">Added</dt>
+                <dd className="text-zinc-900">
+                  {new Date(candidate.created_at).toLocaleDateString()}
+                </dd>
               </div>
-            )}
-            <div>
-              <dt className="text-zinc-500">Added</dt>
-              <dd className="text-zinc-900">
-                {new Date(candidate.created_at).toLocaleDateString()}
-              </dd>
-            </div>
-          </dl>
-        </Card>
+            </dl>
+          </Card>
+        </div>
 
         <div className="lg:col-span-2 space-y-6">
           {skills.length > 0 && (
@@ -91,6 +124,11 @@ export default async function CandidateDetailPage({
               </div>
             </Card>
           )}
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Resume</h3>
+            <ResumeUpload candidateId={id} currentUrl={candidate.resume_url} />
+          </Card>
 
           {candidate.notes && (
             <Card>

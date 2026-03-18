@@ -2,13 +2,26 @@ import { getJob, updateJobStatus } from "@/actions/jobs";
 import { getPlacementsByJob } from "@/actions/placements";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/badge";
+import { StatusBadge, PriorityBadge, Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+const employmentLabels: Record<string, string> = {
+  full_time: "Full-Time",
+  part_time: "Part-Time",
+  contract: "Contract",
+  temp_to_hire: "Temp-to-Hire",
+};
+
+const payTypeLabels: Record<string, string> = {
+  salary: "Salary",
+  hourly: "Hourly",
+  per_diem: "Per Diem",
+};
 
 export default async function JobDetailPage({
   params,
@@ -78,6 +91,20 @@ export default async function JobDetailPage({
                 <StatusBadge status={job.status} />
               </dd>
             </div>
+            <div>
+              <dt className="text-zinc-500">Priority</dt>
+              <dd className="mt-1">
+                <PriorityBadge priority={job.priority} />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Type</dt>
+              <dd className="text-zinc-900">
+                {employmentLabels[job.employment_type] ?? job.employment_type}
+                {" · "}
+                {payTypeLabels[job.pay_type] ?? job.pay_type}
+              </dd>
+            </div>
             {job.location && (
               <div>
                 <dt className="text-zinc-500">Location</dt>
@@ -115,6 +142,17 @@ export default async function JobDetailPage({
               </h3>
               <p className="text-sm text-zinc-600 whitespace-pre-wrap">
                 {job.description}
+              </p>
+            </Card>
+          )}
+
+          {job.urgency_notes && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">
+                Urgency Notes
+              </h3>
+              <p className="text-sm text-zinc-600 whitespace-pre-wrap">
+                {job.urgency_notes}
               </p>
             </Card>
           )}

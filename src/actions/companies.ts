@@ -6,15 +6,35 @@ import {
   safeMetricQuery,
 } from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
-import type { Company } from "@/types/database";
+import type { Company, CompanyStatus } from "@/types/database";
 
-export async function getCompanies(): Promise<Company[]> {
+export interface CompanyFilters {
+  search?: string;
+  status?: CompanyStatus | "";
+  industry?: string;
+  location?: string;
+  sort?: string;
+}
+
+export async function getCompanies(filters?: CompanyFilters): Promise<Company[]> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("companies")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let query = supabase.from("companies").select("*");
+
+    if (filters?.search) {
+      query = query.or(
+        `name.ilike.%${filters.search}%,industry.ilike.%${filters.search}%,location.ilike.%${filters.search}%,contact_email.ilike.%${filters.search}%`
+      );
+    }
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+
+    const sortField = filters?.sort || "created_at";
+    const ascending = sortField === "name";
+    query = query.order(sortField, { ascending });
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("[getCompanies] Supabase error:", error.message, error.code);
@@ -56,6 +76,10 @@ export async function createCompany(formData: FormData) {
     industry: (formData.get("industry") as string) || null,
     location: (formData.get("location") as string) || null,
     contact_email: (formData.get("contact_email") as string) || null,
+    contact_name: (formData.get("contact_name") as string) || null,
+    contact_phone: (formData.get("contact_phone") as string) || null,
+    notes: (formData.get("notes") as string) || null,
+    status: (formData.get("status") as CompanyStatus) || "lead",
   });
 
   if (error) {
@@ -77,12 +101,32 @@ export async function updateCompany(id: string, formData: FormData) {
       industry: (formData.get("industry") as string) || null,
       location: (formData.get("location") as string) || null,
       contact_email: (formData.get("contact_email") as string) || null,
+      contact_name: (formData.get("contact_name") as string) || null,
+      contact_phone: (formData.get("contact_phone") as string) || null,
+      notes: (formData.get("notes") as string) || null,
+      status: (formData.get("status") as CompanyStatus) || "lead",
     })
     .eq("id", id);
 
   if (error) {
     console.error("[updateCompany] Supabase error:", error.message);
     throw new Error("Failed to update company. Please try again.");
+  }
+  revalidatePath("/companies");
+  revalidatePath(`/companies/${id}`);
+}
+
+export async function updateCompanyStatus(id: string, status: CompanyStatus) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[updateCompanyStatus] Supabase error:", error.message);
+    throw new Error("Failed to update company status. Please try again.");
   }
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);

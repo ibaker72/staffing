@@ -1,6 +1,10 @@
 export type CandidateStatus = "new" | "contacted" | "interviewing" | "placed" | "rejected";
 export type JobStatus = "open" | "closed";
 export type PlacementStatus = "pending" | "hired" | "paid";
+export type CompanyStatus = "lead" | "active" | "inactive";
+export type JobPriority = "low" | "medium" | "high";
+export type EmploymentType = "full_time" | "part_time" | "contract" | "temp_to_hire";
+export type PayType = "hourly" | "salary" | "per_diem";
 
 export interface Company {
   id: string;
@@ -9,6 +13,10 @@ export interface Company {
   industry: string | null;
   location: string | null;
   contact_email: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  notes: string | null;
+  status: CompanyStatus;
   created_at: string;
 }
 
@@ -21,6 +29,11 @@ export interface Candidate {
   skills: string[];
   notes: string | null;
   status: CandidateStatus;
+  source: string | null;
+  years_experience: number | null;
+  desired_salary: number | null;
+  resume_url: string | null;
+  last_contacted_at: string | null;
   created_at: string;
 }
 
@@ -32,6 +45,10 @@ export interface Job {
   location: string | null;
   salary_range: string | null;
   status: JobStatus;
+  priority: JobPriority;
+  urgency_notes: string | null;
+  employment_type: EmploymentType;
+  pay_type: PayType;
   created_at: string;
 }
 
@@ -42,6 +59,10 @@ export interface Placement {
   company_id: string;
   placement_fee: number;
   status: PlacementStatus;
+  hired_at: string | null;
+  paid_at: string | null;
+  start_date: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -57,6 +78,10 @@ export interface Database {
           industry: string | null;
           location: string | null;
           contact_email: string | null;
+          contact_name: string | null;
+          contact_phone: string | null;
+          notes: string | null;
+          status: CompanyStatus;
           created_at: string;
         };
         Insert: {
@@ -66,6 +91,10 @@ export interface Database {
           industry?: string | null;
           location?: string | null;
           contact_email?: string | null;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          notes?: string | null;
+          status?: CompanyStatus;
           created_at?: string;
         };
         Update: {
@@ -75,6 +104,10 @@ export interface Database {
           industry?: string | null;
           location?: string | null;
           contact_email?: string | null;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          notes?: string | null;
+          status?: CompanyStatus;
           created_at?: string;
         };
         Relationships: [];
@@ -89,6 +122,11 @@ export interface Database {
           skills: string[];
           notes: string | null;
           status: CandidateStatus;
+          source: string | null;
+          years_experience: number | null;
+          desired_salary: number | null;
+          resume_url: string | null;
+          last_contacted_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -100,6 +138,11 @@ export interface Database {
           skills?: string[];
           notes?: string | null;
           status?: CandidateStatus;
+          source?: string | null;
+          years_experience?: number | null;
+          desired_salary?: number | null;
+          resume_url?: string | null;
+          last_contacted_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -111,6 +154,11 @@ export interface Database {
           skills?: string[];
           notes?: string | null;
           status?: CandidateStatus;
+          source?: string | null;
+          years_experience?: number | null;
+          desired_salary?: number | null;
+          resume_url?: string | null;
+          last_contacted_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -124,6 +172,10 @@ export interface Database {
           location: string | null;
           salary_range: string | null;
           status: JobStatus;
+          priority: JobPriority;
+          urgency_notes: string | null;
+          employment_type: EmploymentType;
+          pay_type: PayType;
           created_at: string;
         };
         Insert: {
@@ -134,6 +186,10 @@ export interface Database {
           location?: string | null;
           salary_range?: string | null;
           status?: JobStatus;
+          priority?: JobPriority;
+          urgency_notes?: string | null;
+          employment_type?: EmploymentType;
+          pay_type?: PayType;
           created_at?: string;
         };
         Update: {
@@ -144,6 +200,10 @@ export interface Database {
           location?: string | null;
           salary_range?: string | null;
           status?: JobStatus;
+          priority?: JobPriority;
+          urgency_notes?: string | null;
+          employment_type?: EmploymentType;
+          pay_type?: PayType;
           created_at?: string;
         };
         Relationships: [
@@ -164,6 +224,10 @@ export interface Database {
           company_id: string;
           placement_fee: number;
           status: PlacementStatus;
+          hired_at: string | null;
+          paid_at: string | null;
+          start_date: string | null;
+          notes: string | null;
           created_at: string;
         };
         Insert: {
@@ -173,6 +237,10 @@ export interface Database {
           company_id: string;
           placement_fee?: number;
           status?: PlacementStatus;
+          hired_at?: string | null;
+          paid_at?: string | null;
+          start_date?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
         Update: {
@@ -182,6 +250,10 @@ export interface Database {
           company_id?: string;
           placement_fee?: number;
           status?: PlacementStatus;
+          hired_at?: string | null;
+          paid_at?: string | null;
+          start_date?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -215,6 +287,10 @@ export interface Database {
       candidate_status: CandidateStatus;
       job_status: JobStatus;
       placement_status: PlacementStatus;
+      company_status: CompanyStatus;
+      job_priority: JobPriority;
+      employment_type: EmploymentType;
+      pay_type: PayType;
     };
     CompositeTypes: Record<string, never>;
   };

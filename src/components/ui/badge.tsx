@@ -38,8 +38,23 @@ export function StatusBadge({ status }: { status: string }) {
     pending: { label: "Pending", variant: "warning" },
     hired: { label: "Hired", variant: "info" },
     paid: { label: "Paid", variant: "success" },
+    // Company
+    lead: { label: "Lead", variant: "info" },
+    active: { label: "Active", variant: "success" },
+    inactive: { label: "Inactive", variant: "default" },
   };
 
   const entry = map[status] ?? { label: status, variant: "default" };
+  return <Badge variant={entry.variant as keyof typeof variants}>{entry.label}</Badge>;
+}
+
+export function PriorityBadge({ priority }: { priority: string }) {
+  const map: Record<string, { label: string; variant: string }> = {
+    low: { label: "Low", variant: "default" },
+    medium: { label: "Medium", variant: "warning" },
+    high: { label: "High", variant: "danger" },
+  };
+
+  const entry = map[priority] ?? { label: priority, variant: "default" };
   return <Badge variant={entry.variant as keyof typeof variants}>{entry.label}</Badge>;
 }

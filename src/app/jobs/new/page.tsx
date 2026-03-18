@@ -49,10 +49,47 @@ export default async function NewJobPage({
               required
               defaultValue={company_id ?? ""}
             />
-            <Input label="Job Title" id="title" name="title" required placeholder="Senior Software Engineer" />
+            <Input label="Job Title" id="title" name="title" required placeholder="HVAC Service Technician" />
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Priority"
+                id="priority"
+                name="priority"
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                ]}
+                defaultValue="medium"
+              />
+              <Select
+                label="Employment Type"
+                id="employment_type"
+                name="employment_type"
+                options={[
+                  { value: "full_time", label: "Full-Time" },
+                  { value: "part_time", label: "Part-Time" },
+                  { value: "contract", label: "Contract" },
+                  { value: "temp_to_hire", label: "Temp-to-Hire" },
+                ]}
+                defaultValue="full_time"
+              />
+            </div>
+            <Select
+              label="Pay Type"
+              id="pay_type"
+              name="pay_type"
+              options={[
+                { value: "salary", label: "Salary" },
+                { value: "hourly", label: "Hourly" },
+                { value: "per_diem", label: "Per Diem" },
+              ]}
+              defaultValue="salary"
+            />
+            <Input label="Location" id="location" name="location" placeholder="Remote / Dallas, TX" />
+            <Input label="Salary Range" id="salary_range" name="salary_range" placeholder="$55k - $75k" />
             <Textarea label="Description" id="description" name="description" placeholder="Role responsibilities and requirements..." />
-            <Input label="Location" id="location" name="location" placeholder="Remote / New York, NY" />
-            <Input label="Salary Range" id="salary_range" name="salary_range" placeholder="$120k - $160k" />
+            <Textarea label="Urgency Notes" id="urgency_notes" name="urgency_notes" placeholder="Any time-sensitive details..." />
             <div className="flex gap-3 pt-2">
               <Button type="submit">Create Job</Button>
             </div>

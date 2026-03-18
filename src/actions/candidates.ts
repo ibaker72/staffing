@@ -8,13 +8,35 @@ import {
 import { revalidatePath } from "next/cache";
 import type { Candidate, CandidateStatus } from "@/types/database";
 
-export async function getCandidates(): Promise<Candidate[]> {
+export interface CandidateFilters {
+  search?: string;
+  status?: CandidateStatus | "";
+  source?: string;
+  sort?: string;
+}
+
+export async function getCandidates(filters?: CandidateFilters): Promise<Candidate[]> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("candidates")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let query = supabase.from("candidates").select("*");
+
+    if (filters?.search) {
+      query = query.or(
+        `full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,location.ilike.%${filters.search}%`
+      );
+    }
+    if (filters?.status) {
+      query = query.eq("status", filters.status);
+    }
+    if (filters?.source) {
+      query = query.eq("source", filters.source);
+    }
+
+    const sortField = filters?.sort || "created_at";
+    const ascending = sortField === "full_name";
+    query = query.order(sortField, { ascending });
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("[getCandidates] Supabase error:", error.message, error.code);
@@ -55,6 +77,9 @@ export async function createCandidate(formData: FormData) {
     ? skillsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
 
+  const yearsExp = formData.get("years_experience") as string;
+  const desiredSalary = formData.get("desired_salary") as string;
+
   const { error } = await supabase.from("candidates").insert({
     full_name: formData.get("full_name") as string,
     email: (formData.get("email") as string) || null,
@@ -63,6 +88,10 @@ export async function createCandidate(formData: FormData) {
     skills,
     notes: (formData.get("notes") as string) || null,
     status: "new" as CandidateStatus,
+    source: (formData.get("source") as string) || null,
+    years_experience: yearsExp ? parseInt(yearsExp, 10) : null,
+    desired_salary: desiredSalary ? parseFloat(desiredSalary) : null,
+    resume_url: (formData.get("resume_url") as string) || null,
   });
 
   if (error) {
@@ -76,9 +105,14 @@ export async function createCandidate(formData: FormData) {
 export async function updateCandidateStatus(id: string, status: CandidateStatus) {
   const supabase = await createClient();
 
+  const updateData: Record<string, unknown> = { status };
+  if (status === "contacted") {
+    updateData.last_contacted_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from("candidates")
-    .update({ status })
+    .update(updateData)
     .eq("id", id);
 
   if (error) {
@@ -97,6 +131,9 @@ export async function updateCandidate(id: string, formData: FormData) {
     ? skillsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
 
+  const yearsExp = formData.get("years_experience") as string;
+  const desiredSalary = formData.get("desired_salary") as string;
+
   const { error } = await supabase
     .from("candidates")
     .update({
@@ -106,6 +143,10 @@ export async function updateCandidate(id: string, formData: FormData) {
       location: (formData.get("location") as string) || null,
       skills,
       notes: (formData.get("notes") as string) || null,
+      source: (formData.get("source") as string) || null,
+      years_experience: yearsExp ? parseInt(yearsExp, 10) : null,
+      desired_salary: desiredSalary ? parseFloat(desiredSalary) : null,
+      resume_url: (formData.get("resume_url") as string) || null,
     })
     .eq("id", id);
 
