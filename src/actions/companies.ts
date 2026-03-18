@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  type MetricQueryResult,
+  safeMetricQuery,
+} from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
 import type { Company } from "@/types/database";
 
@@ -63,11 +67,19 @@ export async function updateCompany(id: string, formData: FormData) {
 }
 
 export async function getCompanyCount() {
-  const supabase = await createClient();
-  const { count, error } = await supabase
-    .from("companies")
-    .select("*", { count: "exact", head: true });
+  const result = await getCompanyCountMetric();
+  return result.value;
+}
 
-  if (error) throw error;
-  return count ?? 0;
+export async function getCompanyCountMetric(): Promise<MetricQueryResult> {
+  const supabase = await createClient();
+
+  return safeMetricQuery("companies", async () => {
+    const { count, error } = await supabase
+      .from("companies")
+      .select("*", { count: "exact", head: true });
+
+    if (error) throw error;
+    return count ?? 0;
+  });
 }

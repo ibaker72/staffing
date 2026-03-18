@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  type MetricQueryResult,
+  safeMetricQuery,
+} from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
 import type { Job } from "@/types/database";
 
@@ -58,14 +62,22 @@ export async function updateJobStatus(id: string, status: "open" | "closed") {
 }
 
 export async function getOpenJobCount() {
-  const supabase = await createClient();
-  const { count, error } = await supabase
-    .from("jobs")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "open");
+  const result = await getOpenJobCountMetric();
+  return result.value;
+}
 
-  if (error) throw error;
-  return count ?? 0;
+export async function getOpenJobCountMetric(): Promise<MetricQueryResult> {
+  const supabase = await createClient();
+
+  return safeMetricQuery("jobs", async () => {
+    const { count, error } = await supabase
+      .from("jobs")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "open");
+
+    if (error) throw error;
+    return count ?? 0;
+  });
 }
 
 export async function getJobsByCompany(companyId: string) {

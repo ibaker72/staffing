@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  type MetricQueryResult,
+  safeMetricQuery,
+} from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
 import type { Placement, PlacementStatus } from "@/types/database";
 
@@ -52,14 +56,26 @@ export async function updatePlacementStatus(id: string, status: PlacementStatus)
 }
 
 export async function getTotalRevenue() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("placements")
-    .select("placement_fee")
-    .eq("status", "paid");
+  const result = await getTotalRevenueMetric();
+  return result.value;
+}
 
-  if (error) throw error;
-  return (data ?? []).reduce((sum, p) => sum + Number(p.placement_fee), 0);
+export async function getTotalRevenueMetric(): Promise<MetricQueryResult> {
+  const supabase = await createClient();
+
+  return safeMetricQuery("placements", async () => {
+    const { data, error } = await supabase
+      .from("placements")
+      .select("placement_fee")
+      .eq("status", "paid");
+
+    if (error) throw error;
+
+    return (data ?? []).reduce((sum, placement) => {
+      const fee = Number(placement?.placement_fee);
+      return sum + (Number.isFinite(fee) ? fee : 0);
+    }, 0);
+  });
 }
 
 export async function getPlacementsByJob(jobId: string) {

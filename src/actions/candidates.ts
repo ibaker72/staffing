@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  type MetricQueryResult,
+  safeMetricQuery,
+} from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
 import type { Candidate, CandidateStatus } from "@/types/database";
 
@@ -89,11 +93,19 @@ export async function updateCandidate(id: string, formData: FormData) {
 }
 
 export async function getCandidateCount() {
-  const supabase = await createClient();
-  const { count, error } = await supabase
-    .from("candidates")
-    .select("*", { count: "exact", head: true });
+  const result = await getCandidateCountMetric();
+  return result.value;
+}
 
-  if (error) throw error;
-  return count ?? 0;
+export async function getCandidateCountMetric(): Promise<MetricQueryResult> {
+  const supabase = await createClient();
+
+  return safeMetricQuery("candidates", async () => {
+    const { count, error } = await supabase
+      .from("candidates")
+      .select("*", { count: "exact", head: true });
+
+    if (error) throw error;
+    return count ?? 0;
+  });
 }
