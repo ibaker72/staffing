@@ -76,6 +76,7 @@ export async function getJob(id: string): Promise<JobWithCompany | null> {
 
 export async function createJob(formData: FormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const title = formData.get("title") as string;
 
   const { data, error } = await supabase.from("jobs").insert({
@@ -88,6 +89,7 @@ export async function createJob(formData: FormData) {
     urgency_notes: (formData.get("urgency_notes") as string) || null,
     employment_type: (formData.get("employment_type") as EmploymentType) || "full_time",
     pay_type: (formData.get("pay_type") as PayType) || "salary",
+    owner_id: user?.id ?? null,
   }).select("id").single();
 
   if (error) {
@@ -196,5 +198,22 @@ export async function getJobStatusBreakdown(): Promise<Record<string, number>> {
     return counts;
   } catch {
     return {};
+  }
+}
+
+export async function getMyJobs(userId: string, limit = 10): Promise<JobWithCompany[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*, company:companies(id, name)")
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return [];
+    return (data ?? []) as JobWithCompany[];
+  } catch {
+    return [];
   }
 }

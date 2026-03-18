@@ -72,6 +72,7 @@ export async function getCandidate(id: string): Promise<Candidate | null> {
 
 export async function createCandidate(formData: FormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   const skillsRaw = formData.get("skills") as string;
   const skills = skillsRaw
@@ -94,6 +95,7 @@ export async function createCandidate(formData: FormData) {
     years_experience: yearsExp ? parseInt(yearsExp, 10) : null,
     desired_salary: desiredSalary ? parseFloat(desiredSalary) : null,
     resume_url: (formData.get("resume_url") as string) || null,
+    owner_id: user?.id ?? null,
   }).select("id").single();
 
   if (error) {
@@ -267,5 +269,22 @@ export async function getCandidateStatusBreakdown(): Promise<Record<string, numb
     return counts;
   } catch {
     return {};
+  }
+}
+
+export async function getMyCandidates(userId: string, limit = 10): Promise<Candidate[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("*")
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return [];
+    return (data ?? []) as Candidate[];
+  } catch {
+    return [];
   }
 }

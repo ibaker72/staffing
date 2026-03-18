@@ -3,6 +3,7 @@ import { getJobsByCompany } from "@/actions/jobs";
 import { getEntityActivity } from "@/actions/activity";
 import { getTasks, createTask, completeTask } from "@/actions/tasks";
 import { getActiveToken, generatePortalToken } from "@/actions/portal";
+import { inviteClient, getInvitationsForCompany } from "@/actions/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { TaskPanel } from "@/components/task-panel";
 import { WorkflowFields } from "@/components/workflow-fields";
 import { PortalTokenPanel } from "@/components/portal-token-panel";
+import { ClientInvitationPanel } from "@/components/client-invitation-panel";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { CompanyStatus, OutreachStatus } from "@/types/database";
@@ -43,11 +45,12 @@ export default async function CompanyDetailPage({
     );
   }
 
-  const [jobs, activity, tasks, activeToken] = await Promise.all([
+  const [jobs, activity, tasks, activeToken, invitations] = await Promise.all([
     getJobsByCompany(id),
     getEntityActivity("company", id),
     getTasks({ entityType: "company", entityId: id }),
     getActiveToken(id),
+    getInvitationsForCompany(id),
   ]);
 
   async function changeStatus(formData: FormData) {
@@ -86,6 +89,13 @@ export default async function CompanyDetailPage({
     "use server";
     await generatePortalToken(id);
     revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleInviteClient(formData: FormData) {
+    "use server";
+    const result = await inviteClient(formData);
+    revalidatePath(`/companies/${id}`);
+    return result;
   }
 
   return (
@@ -220,6 +230,15 @@ export default async function CompanyDetailPage({
               token={activeToken?.token ?? null}
               expiresAt={activeToken?.expires_at ?? null}
               onGenerate={handleGenerateToken}
+            />
+          </Card>
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Client Users</h3>
+            <ClientInvitationPanel
+              companyId={id}
+              invitations={invitations}
+              onInvite={handleInviteClient}
             />
           </Card>
         </div>

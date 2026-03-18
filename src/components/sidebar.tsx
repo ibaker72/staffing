@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "@/actions/auth";
+import { Button } from "@/components/ui/button";
+import type { AuthUser } from "@/lib/auth";
 
 const nav = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutIcon },
@@ -12,16 +15,20 @@ const nav = [
   { label: "Tasks", href: "/tasks", icon: ClipboardIcon },
 ];
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname();
+  const isAdmin = user.profile.role === "admin";
 
   return (
     <>
       {/* Mobile header */}
-      <div className="flex h-14 items-center border-b border-zinc-200 bg-white px-4 lg:hidden">
+      <div className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 lg:hidden">
         <Link href="/dashboard" className="text-lg font-bold text-zinc-900">
           Staffing Engine
         </Link>
+        <span className="text-xs text-zinc-500 truncate max-w-[120px]">
+          {user.profile.full_name || user.email}
+        </span>
       </div>
 
       {/* Mobile bottom nav */}
@@ -69,9 +76,40 @@ export function Sidebar() {
                 </Link>
               );
             })}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  pathname.startsWith("/admin")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <ShieldIcon className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
-          <div className="border-t border-zinc-200 p-4">
-            <p className="text-xs text-zinc-400">Staffing Engine v1.0</p>
+          <div className="border-t border-zinc-200 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-medium text-zinc-600">
+                {(user.profile.full_name || user.email).charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-zinc-900 truncate">
+                  {user.profile.full_name || "User"}
+                </p>
+                <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400 capitalize">{user.profile.role}</span>
+              <form action={signOut}>
+                <Button type="submit" variant="ghost" className="text-[10px] px-1.5 py-0.5 text-zinc-400 hover:text-zinc-600">
+                  Sign Out
+                </Button>
+              </form>
+            </div>
           </div>
         </div>
       </aside>
@@ -125,6 +163,14 @@ function ClipboardIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
     </svg>
   );
 }

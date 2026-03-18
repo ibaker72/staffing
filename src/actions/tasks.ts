@@ -72,6 +72,7 @@ export async function getUpcomingTasks(limit = 10): Promise<Task[]> {
 
 export async function createTask(formData: FormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   const { error } = await supabase.from("tasks").insert({
     title: formData.get("title") as string,
@@ -80,6 +81,7 @@ export async function createTask(formData: FormData) {
     due_date: (formData.get("due_date") as string) || null,
     entity_type: (formData.get("entity_type") as string) || null,
     entity_id: (formData.get("entity_id") as string) || null,
+    owner_id: user?.id ?? null,
   });
 
   if (error) {
@@ -137,4 +139,22 @@ export async function deleteTask(id: string) {
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
+}
+
+export async function getMyTasks(userId: string, limit = 10): Promise<Task[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("owner_id", userId)
+      .is("completed_at", null)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .limit(limit);
+
+    if (error) return [];
+    return (data ?? []) as Task[];
+  } catch {
+    return [];
+  }
 }

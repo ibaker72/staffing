@@ -7,17 +7,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CompactActivityList } from "@/components/activity-timeline";
 import { SubmissionStatusBadge } from "@/components/submission-list";
 import { getCompanyCountMetric, getUpcomingFollowUps } from "@/actions/companies";
-import { getCandidateCountMetric, getCandidateStatusBreakdown, getUpcomingCandidateFollowUps } from "@/actions/candidates";
-import { getOpenJobCountMetric, getRecentJobs, getJobStatusBreakdown } from "@/actions/jobs";
+import { getCandidateCountMetric, getCandidateStatusBreakdown, getUpcomingCandidateFollowUps, getMyCandidates } from "@/actions/candidates";
+import { getOpenJobCountMetric, getRecentJobs, getJobStatusBreakdown, getMyJobs } from "@/actions/jobs";
 import { getTotalRevenueMetric, getPlacementStatusBreakdown } from "@/actions/placements";
 import { getRecentActivity } from "@/actions/activity";
 import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount } from "@/actions/reporting";
-import { getOverdueTasks } from "@/actions/tasks";
+import { getOverdueTasks, getMyTasks } from "@/actions/tasks";
+import { getCurrentUser } from "@/lib/auth";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const currentUser = await getCurrentUser();
   const [
     settledMetrics,
     candidateBreakdown,
@@ -33,6 +35,9 @@ export default async function DashboardPage() {
     activeSubmissions,
     openTasksCount,
     overdueTasks,
+    myJobs,
+    myCandidates,
+    myTasks,
   ] = await Promise.all([
     Promise.allSettled([
       getCompanyCountMetric(),
@@ -53,6 +58,9 @@ export default async function DashboardPage() {
     getActiveSubmissionsCount(),
     getOpenTasksCount(),
     getOverdueTasks(),
+    currentUser ? getMyJobs(currentUser.id) : Promise.resolve([]),
+    currentUser ? getMyCandidates(currentUser.id) : Promise.resolve([]),
+    currentUser ? getMyTasks(currentUser.id) : Promise.resolve([]),
   ]);
 
   const metricTables = ["companies", "candidates", "jobs", "placements"];
@@ -106,6 +114,64 @@ export default async function DashboardPage() {
         title="Dashboard"
         description="Overview of your staffing operations"
       />
+
+      {/* My Work section */}
+      {currentUser && (myJobs.length > 0 || myCandidates.length > 0 || myTasks.length > 0) && (
+        <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          {myTasks.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">My Tasks</h3>
+              <div className="divide-y divide-zinc-100">
+                {myTasks.slice(0, 5).map((task) => {
+                  const isOverdue = task.due_date && new Date(task.due_date) < new Date(new Date().toDateString());
+                  return (
+                    <div key={task.id} className="py-2 first:pt-0 last:pb-0">
+                      <p className="text-sm text-zinc-900">{task.title}</p>
+                      {task.due_date && (
+                        <p className={`text-[10px] ${isOverdue ? "text-red-600 font-medium" : "text-zinc-400"}`}>
+                          Due {new Date(task.due_date).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <Link href="/tasks" className="text-xs text-zinc-500 hover:text-zinc-700 mt-2 block">
+                View all tasks
+              </Link>
+            </Card>
+          )}
+          {myJobs.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">My Jobs</h3>
+              <div className="divide-y divide-zinc-100">
+                {myJobs.slice(0, 5).map((job) => (
+                  <Link key={job.id} href={`/jobs/${job.id}`} className="block py-2 first:pt-0 last:pb-0 hover:bg-zinc-50 -mx-1 px-1 rounded">
+                    <p className="text-sm font-medium text-zinc-900 truncate">{job.title}</p>
+                    <p className="text-xs text-zinc-500 truncate">{job.company?.name}</p>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+          {myCandidates.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">My Candidates</h3>
+              <div className="divide-y divide-zinc-100">
+                {myCandidates.slice(0, 5).map((c) => (
+                  <Link key={c.id} href={`/candidates/${c.id}`} className="block py-2 first:pt-0 last:pb-0 hover:bg-zinc-50 -mx-1 px-1 rounded">
+                    <p className="text-sm font-medium text-zinc-900 truncate">{c.full_name}</p>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={c.status} />
+                      {c.location && <span className="text-xs text-zinc-400">{c.location}</span>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {hasMetricErrors && (
         <div className="mb-4">

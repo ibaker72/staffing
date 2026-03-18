@@ -8,6 +8,36 @@ export type PayType = "hourly" | "salary" | "per_diem";
 export type OutreachStatus = "none" | "initial_contact" | "follow_up" | "in_conversation" | "nurturing" | "closed";
 export type SubmissionStatus = "internal_review" | "submitted" | "client_review" | "interview" | "offer" | "hired" | "rejected";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type UserRole = "admin" | "recruiter" | "client";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientUser {
+  id: string;
+  user_id: string;
+  company_id: string;
+  invited_by: string | null;
+  invited_at: string;
+}
+
+export interface ClientInvitation {
+  id: string;
+  company_id: string;
+  email: string;
+  invited_by: string;
+  token: string;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+}
 
 export interface Company {
   id: string;
@@ -26,6 +56,7 @@ export interface Company {
   assigned_to: string | null;
   next_action: string | null;
   due_date: string | null;
+  owner_id: string | null;
   created_at: string;
 }
 
@@ -48,6 +79,7 @@ export interface Candidate {
   assigned_to: string | null;
   next_action: string | null;
   due_date: string | null;
+  owner_id: string | null;
   created_at: string;
 }
 
@@ -66,6 +98,7 @@ export interface Job {
   assigned_to: string | null;
   next_action: string | null;
   due_date: string | null;
+  owner_id: string | null;
   created_at: string;
 }
 
@@ -90,6 +123,7 @@ export interface ActivityEvent {
   event_type: string;
   description: string;
   metadata: Record<string, unknown>;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -117,6 +151,7 @@ export interface Task {
   completed_at: string | null;
   entity_type: string | null;
   entity_id: string | null;
+  owner_id: string | null;
   created_at: string;
 }
 
@@ -133,6 +168,116 @@ export interface ClientPortalToken {
 export interface Database {
   public: {
     Tables: {
+      user_profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string;
+          role?: UserRole;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string;
+          role?: UserRole;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      client_users: {
+        Row: {
+          id: string;
+          user_id: string;
+          company_id: string;
+          invited_by: string | null;
+          invited_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          company_id: string;
+          invited_by?: string | null;
+          invited_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          company_id?: string;
+          invited_by?: string | null;
+          invited_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_users_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_users_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_invitations: {
+        Row: {
+          id: string;
+          company_id: string;
+          email: string;
+          invited_by: string;
+          token: string;
+          expires_at: string;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_id: string;
+          email: string;
+          invited_by: string;
+          token?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          company_id?: string;
+          email?: string;
+          invited_by?: string;
+          token?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_invitations_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       companies: {
         Row: {
           id: string;
@@ -151,6 +296,7 @@ export interface Database {
           assigned_to: string | null;
           next_action: string | null;
           due_date: string | null;
+          owner_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -170,6 +316,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -189,6 +336,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -213,6 +361,7 @@ export interface Database {
           assigned_to: string | null;
           next_action: string | null;
           due_date: string | null;
+          owner_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -234,6 +383,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -255,6 +405,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -275,6 +426,7 @@ export interface Database {
           assigned_to: string | null;
           next_action: string | null;
           due_date: string | null;
+          owner_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -292,6 +444,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -309,6 +462,7 @@ export interface Database {
           assigned_to?: string | null;
           next_action?: string | null;
           due_date?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -393,6 +547,7 @@ export interface Database {
           event_type: string;
           description: string;
           metadata: Record<string, unknown>;
+          user_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -402,6 +557,7 @@ export interface Database {
           event_type: string;
           description: string;
           metadata?: Record<string, unknown>;
+          user_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -411,6 +567,7 @@ export interface Database {
           event_type?: string;
           description?: string;
           metadata?: Record<string, unknown>;
+          user_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -485,6 +642,7 @@ export interface Database {
           completed_at: string | null;
           entity_type: string | null;
           entity_id: string | null;
+          owner_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -496,6 +654,7 @@ export interface Database {
           completed_at?: string | null;
           entity_type?: string | null;
           entity_id?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -507,6 +666,7 @@ export interface Database {
           completed_at?: string | null;
           entity_type?: string | null;
           entity_id?: string | null;
+          owner_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -560,6 +720,7 @@ export interface Database {
       outreach_status: OutreachStatus;
       submission_status: SubmissionStatus;
       task_priority: TaskPriority;
+      user_role: UserRole;
     };
     CompositeTypes: Record<string, never>;
   };
