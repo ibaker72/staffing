@@ -7,10 +7,10 @@ import { getTotalRevenue } from "@/actions/placements";
 
 export default async function DashboardPage() {
   const [companies, candidates, openJobs, revenue] = await Promise.all([
-    getCompanyCount(),
-    getCandidateCount(),
-    getOpenJobCount(),
-    getTotalRevenue(),
+    getCompanyCount().catch(() => 0),
+    getCandidateCount().catch(() => 0),
+    getOpenJobCount().catch(() => 0),
+    getTotalRevenue().catch(() => 0),
   ]);
 
   const formattedRevenue = new Intl.NumberFormat("en-US", {

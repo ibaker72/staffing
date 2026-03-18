@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
+import { NotFoundState } from "@/components/ui/error-state";
 
 export default async function CompanyDetailPage({
   params,
@@ -11,10 +12,23 @@ export default async function CompanyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [company, jobs] = await Promise.all([
-    getCompany(id),
-    getJobsByCompany(id),
-  ]);
+  const company = await getCompany(id);
+
+  if (!company) {
+    return (
+      <>
+        <PageHeader title="Company" />
+        <NotFoundState
+          title="Company not found"
+          description="This company doesn't exist or couldn't be loaded."
+          backHref="/companies"
+          backLabel="Back to Companies"
+        />
+      </>
+    );
+  }
+
+  const jobs = await getJobsByCompany(id);
 
   return (
     <>

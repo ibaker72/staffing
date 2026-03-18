@@ -35,26 +35,26 @@ export default async function PlacementsPage() {
                       href={`/candidates/${placement.candidate_id}`}
                       className="font-semibold text-zinc-900 hover:underline"
                     >
-                      {placement.candidate.full_name}
+                      {placement.candidate?.full_name ?? "Unknown Candidate"}
                     </Link>
                     <StatusBadge status={placement.status} />
                   </div>
                   <p className="text-sm text-zinc-500">
                     <Link href={`/jobs/${placement.job_id}`} className="hover:underline">
-                      {placement.job.title}
+                      {placement.job?.title ?? "Unknown Job"}
                     </Link>
                     {" at "}
                     <Link href={`/companies/${placement.company_id}`} className="hover:underline">
-                      {placement.company.name}
+                      {placement.company?.name ?? "Unknown Company"}
                     </Link>
                   </p>
-                  {placement.placement_fee > 0 && (
+                  {(Number(placement.placement_fee) || 0) > 0 && (
                     <p className="text-sm font-medium text-zinc-700">
                       Fee:{" "}
                       {new Intl.NumberFormat("en-US", {
                         style: "currency",
                         currency: "USD",
-                      }).format(placement.placement_fee)}
+                      }).format(Number(placement.placement_fee) || 0)}
                     </p>
                   )}
                 </div>

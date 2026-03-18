@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NotFoundState } from "@/components/ui/error-state";
 import { revalidatePath } from "next/cache";
 import type { CandidateStatus } from "@/types/database";
 
@@ -16,12 +17,28 @@ export default async function CandidateDetailPage({
   const { id } = await params;
   const candidate = await getCandidate(id);
 
+  if (!candidate) {
+    return (
+      <>
+        <PageHeader title="Candidate" />
+        <NotFoundState
+          title="Candidate not found"
+          description="This candidate doesn't exist or couldn't be loaded."
+          backHref="/candidates"
+          backLabel="Back to Candidates"
+        />
+      </>
+    );
+  }
+
   async function changeStatus(formData: FormData) {
     "use server";
     const status = formData.get("status") as CandidateStatus;
     await updateCandidateStatus(id, status);
     revalidatePath(`/candidates/${id}`);
   }
+
+  const skills = candidate.skills ?? [];
 
   return (
     <>
@@ -62,11 +79,11 @@ export default async function CandidateDetailPage({
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
-          {candidate.skills.length > 0 && (
+          {skills.length > 0 && (
             <Card>
               <h3 className="text-sm font-semibold text-zinc-900 mb-3">Skills</h3>
               <div className="flex flex-wrap gap-2">
-                {candidate.skills.map((skill) => (
+                {skills.map((skill) => (
                   <Badge key={skill}>{skill}</Badge>
                 ))}
               </div>

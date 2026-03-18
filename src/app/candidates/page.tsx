@@ -40,7 +40,7 @@ export default async function CandidatesPage() {
                 {candidate.location && (
                   <p className="mt-0.5 text-xs text-zinc-400">{candidate.location}</p>
                 )}
-                {candidate.skills.length > 0 && (
+                {(candidate.skills?.length ?? 0) > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {candidate.skills.slice(0, 4).map((skill) => (
                       <Badge key={skill}>{skill}</Badge>
