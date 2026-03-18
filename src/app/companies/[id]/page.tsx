@@ -1,6 +1,8 @@
 import { getCompany, updateCompanyStatus, updateCompanyOutreach } from "@/actions/companies";
 import { getJobsByCompany } from "@/actions/jobs";
 import { getEntityActivity } from "@/actions/activity";
+import { getTasks, createTask, completeTask } from "@/actions/tasks";
+import { getActiveToken, generatePortalToken } from "@/actions/portal";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
@@ -8,7 +10,11 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
 import { OutreachPanel } from "@/components/outreach-panel";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { TaskPanel } from "@/components/task-panel";
+import { WorkflowFields } from "@/components/workflow-fields";
+import { PortalTokenPanel } from "@/components/portal-token-panel";
 import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import type { CompanyStatus, OutreachStatus } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +43,11 @@ export default async function CompanyDetailPage({
     );
   }
 
-  const [jobs, activity] = await Promise.all([
+  const [jobs, activity, tasks, activeToken] = await Promise.all([
     getJobsByCompany(id),
     getEntityActivity("company", id),
+    getTasks({ entityType: "company", entityId: id }),
+    getActiveToken(id),
   ]);
 
   async function changeStatus(formData: FormData) {
@@ -52,6 +60,31 @@ export default async function CompanyDetailPage({
   async function handleOutreachUpdate(_id: string, outreachStatus: OutreachStatus, followUpDate: string | null) {
     "use server";
     await updateCompanyOutreach(id, outreachStatus, followUpDate);
+    revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleCreateTask(formData: FormData) {
+    "use server";
+    await createTask(formData);
+    revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleCompleteTask(taskId: string) {
+    "use server";
+    await completeTask(taskId);
+    revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleWorkflowSave(_id: string, assignedTo: string | null, nextAction: string | null, dueDate: string | null) {
+    "use server";
+    const supabase = await createClient();
+    await supabase.from("companies").update({ assigned_to: assignedTo, next_action: nextAction, due_date: dueDate }).eq("id", id);
+    revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleGenerateToken() {
+    "use server";
+    await generatePortalToken(id);
     revalidatePath(`/companies/${id}`);
   }
 
@@ -105,6 +138,26 @@ export default async function CompanyDetailPage({
                   <dd className="text-zinc-900">{company.contact_phone}</dd>
                 </div>
               )}
+              {company.assigned_to && (
+                <div>
+                  <dt className="text-zinc-500">Assigned To</dt>
+                  <dd className="text-zinc-900">{company.assigned_to}</dd>
+                </div>
+              )}
+              {company.next_action && (
+                <div>
+                  <dt className="text-zinc-500">Next Action</dt>
+                  <dd className="text-zinc-900">{company.next_action}</dd>
+                </div>
+              )}
+              {company.due_date && (
+                <div>
+                  <dt className="text-zinc-500">Due Date</dt>
+                  <dd className={`${new Date(company.due_date) < new Date(new Date().toDateString()) ? "text-red-600 font-medium" : "text-zinc-900"}`}>
+                    {new Date(company.due_date).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
               {company.last_contacted_at && (
                 <div>
                   <dt className="text-zinc-500">Last Contacted</dt>
@@ -149,6 +202,26 @@ export default async function CompanyDetailPage({
               onUpdate={handleOutreachUpdate}
             />
           </Card>
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Workflow</h3>
+            <WorkflowFields
+              entityId={id}
+              assignedTo={company.assigned_to}
+              nextAction={company.next_action}
+              dueDate={company.due_date}
+              onSave={handleWorkflowSave}
+            />
+          </Card>
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Client Portal</h3>
+            <PortalTokenPanel
+              token={activeToken?.token ?? null}
+              expiresAt={activeToken?.expires_at ?? null}
+              onGenerate={handleGenerateToken}
+            />
+          </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -158,6 +231,17 @@ export default async function CompanyDetailPage({
               <p className="text-sm text-zinc-600 whitespace-pre-wrap">{company.notes}</p>
             </Card>
           )}
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Tasks</h3>
+            <TaskPanel
+              tasks={tasks}
+              entityType="company"
+              entityId={id}
+              onComplete={handleCompleteTask}
+              onCreate={handleCreateTask}
+            />
+          </Card>
 
           <Card>
             <h3 className="text-sm font-semibold text-zinc-900 mb-4">

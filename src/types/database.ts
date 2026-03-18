@@ -6,6 +6,8 @@ export type JobPriority = "low" | "medium" | "high";
 export type EmploymentType = "full_time" | "part_time" | "contract" | "temp_to_hire";
 export type PayType = "hourly" | "salary" | "per_diem";
 export type OutreachStatus = "none" | "initial_contact" | "follow_up" | "in_conversation" | "nurturing" | "closed";
+export type SubmissionStatus = "internal_review" | "submitted" | "client_review" | "interview" | "offer" | "hired" | "rejected";
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface Company {
   id: string;
@@ -21,6 +23,9 @@ export interface Company {
   outreach_status: OutreachStatus;
   follow_up_date: string | null;
   last_contacted_at: string | null;
+  assigned_to: string | null;
+  next_action: string | null;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -40,6 +45,9 @@ export interface Candidate {
   last_contacted_at: string | null;
   outreach_status: OutreachStatus;
   follow_up_date: string | null;
+  assigned_to: string | null;
+  next_action: string | null;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -55,6 +63,9 @@ export interface Job {
   urgency_notes: string | null;
   employment_type: EmploymentType;
   pay_type: PayType;
+  assigned_to: string | null;
+  next_action: string | null;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -82,6 +93,42 @@ export interface ActivityEvent {
   created_at: string;
 }
 
+export interface CandidateSubmission {
+  id: string;
+  candidate_id: string;
+  job_id: string;
+  status: SubmissionStatus;
+  submitted_at: string | null;
+  client_reviewed_at: string | null;
+  interview_at: string | null;
+  offered_at: string | null;
+  decided_at: string | null;
+  internal_notes: string | null;
+  client_feedback: string | null;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: TaskPriority;
+  due_date: string | null;
+  completed_at: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  created_at: string;
+}
+
+export interface ClientPortalToken {
+  id: string;
+  company_id: string;
+  token: string;
+  expires_at: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 // Supabase Database type for typed client
 export interface Database {
   public: {
@@ -101,6 +148,9 @@ export interface Database {
           outreach_status: OutreachStatus;
           follow_up_date: string | null;
           last_contacted_at: string | null;
+          assigned_to: string | null;
+          next_action: string | null;
+          due_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -117,6 +167,9 @@ export interface Database {
           outreach_status?: OutreachStatus;
           follow_up_date?: string | null;
           last_contacted_at?: string | null;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Update: {
@@ -133,6 +186,9 @@ export interface Database {
           outreach_status?: OutreachStatus;
           follow_up_date?: string | null;
           last_contacted_at?: string | null;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -154,6 +210,9 @@ export interface Database {
           last_contacted_at: string | null;
           outreach_status: OutreachStatus;
           follow_up_date: string | null;
+          assigned_to: string | null;
+          next_action: string | null;
+          due_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -172,6 +231,9 @@ export interface Database {
           last_contacted_at?: string | null;
           outreach_status?: OutreachStatus;
           follow_up_date?: string | null;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Update: {
@@ -190,6 +252,9 @@ export interface Database {
           last_contacted_at?: string | null;
           outreach_status?: OutreachStatus;
           follow_up_date?: string | null;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -207,6 +272,9 @@ export interface Database {
           urgency_notes: string | null;
           employment_type: EmploymentType;
           pay_type: PayType;
+          assigned_to: string | null;
+          next_action: string | null;
+          due_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -221,6 +289,9 @@ export interface Database {
           urgency_notes?: string | null;
           employment_type?: EmploymentType;
           pay_type?: PayType;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Update: {
@@ -235,6 +306,9 @@ export interface Database {
           urgency_notes?: string | null;
           employment_type?: EmploymentType;
           pay_type?: PayType;
+          assigned_to?: string | null;
+          next_action?: string | null;
+          due_date?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -341,6 +415,137 @@ export interface Database {
         };
         Relationships: [];
       };
+      candidate_submissions: {
+        Row: {
+          id: string;
+          candidate_id: string;
+          job_id: string;
+          status: SubmissionStatus;
+          submitted_at: string | null;
+          client_reviewed_at: string | null;
+          interview_at: string | null;
+          offered_at: string | null;
+          decided_at: string | null;
+          internal_notes: string | null;
+          client_feedback: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          candidate_id: string;
+          job_id: string;
+          status?: SubmissionStatus;
+          submitted_at?: string | null;
+          client_reviewed_at?: string | null;
+          interview_at?: string | null;
+          offered_at?: string | null;
+          decided_at?: string | null;
+          internal_notes?: string | null;
+          client_feedback?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          candidate_id?: string;
+          job_id?: string;
+          status?: SubmissionStatus;
+          submitted_at?: string | null;
+          client_reviewed_at?: string | null;
+          interview_at?: string | null;
+          offered_at?: string | null;
+          decided_at?: string | null;
+          internal_notes?: string | null;
+          client_feedback?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "candidate_submissions_candidate_id_fkey";
+            columns: ["candidate_id"];
+            isOneToOne: false;
+            referencedRelation: "candidates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "candidate_submissions_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tasks: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          priority: TaskPriority;
+          due_date: string | null;
+          completed_at: string | null;
+          entity_type: string | null;
+          entity_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          priority?: TaskPriority;
+          due_date?: string | null;
+          completed_at?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          priority?: TaskPriority;
+          due_date?: string | null;
+          completed_at?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      client_portal_tokens: {
+        Row: {
+          id: string;
+          company_id: string;
+          token: string;
+          expires_at: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_id: string;
+          token?: string;
+          expires_at?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          company_id?: string;
+          token?: string;
+          expires_at?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_tokens_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -353,6 +558,8 @@ export interface Database {
       employment_type: EmploymentType;
       pay_type: PayType;
       outreach_status: OutreachStatus;
+      submission_status: SubmissionStatus;
+      task_priority: TaskPriority;
     };
     CompositeTypes: Record<string, never>;
   };

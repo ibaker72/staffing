@@ -5,11 +5,14 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CompactActivityList } from "@/components/activity-timeline";
+import { SubmissionStatusBadge } from "@/components/submission-list";
 import { getCompanyCountMetric, getUpcomingFollowUps } from "@/actions/companies";
 import { getCandidateCountMetric, getCandidateStatusBreakdown, getUpcomingCandidateFollowUps } from "@/actions/candidates";
 import { getOpenJobCountMetric, getRecentJobs, getJobStatusBreakdown } from "@/actions/jobs";
 import { getTotalRevenueMetric, getPlacementStatusBreakdown } from "@/actions/placements";
 import { getRecentActivity } from "@/actions/activity";
+import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount } from "@/actions/reporting";
+import { getOverdueTasks } from "@/actions/tasks";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +27,12 @@ export default async function DashboardPage() {
     recentJobs,
     companyFollowUps,
     candidateFollowUps,
+    placementsThisMonth,
+    revenueByCompany,
+    submissionFunnel,
+    activeSubmissions,
+    openTasksCount,
+    overdueTasks,
   ] = await Promise.all([
     Promise.allSettled([
       getCompanyCountMetric(),
@@ -38,6 +47,12 @@ export default async function DashboardPage() {
     getRecentJobs(5),
     getUpcomingFollowUps(),
     getUpcomingCandidateFollowUps(),
+    getPlacementsThisMonth(),
+    getRevenueByCompany(),
+    getSubmissionFunnelCounts(),
+    getActiveSubmissionsCount(),
+    getOpenTasksCount(),
+    getOverdueTasks(),
   ]);
 
   const metricTables = ["companies", "candidates", "jobs", "placements"];
@@ -83,6 +98,8 @@ export default async function DashboardPage() {
     })),
   ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
 
+  const submissionStatuses = ["internal_review", "submitted", "client_review", "interview", "offer", "hired", "rejected"] as const;
+
   return (
     <>
       <PageHeader
@@ -111,8 +128,20 @@ export default async function DashboardPage() {
         <MetricCard title="Total Revenue" value={formattedRevenue} subtitle="From paid placements" />
       </div>
 
+      {/* Secondary metrics */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard title="Placements This Month" value={placementsThisMonth} />
+        <MetricCard title="Active Submissions" value={activeSubmissions} subtitle="In pipeline" />
+        <MetricCard title="Open Tasks" value={openTasksCount} />
+        <MetricCard
+          title="Overdue Tasks"
+          value={overdueTasks.length}
+          subtitle={overdueTasks.length > 0 ? "Needs attention" : undefined}
+        />
+      </div>
+
       {/* Status breakdowns */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <h3 className="text-sm font-semibold text-zinc-900 mb-3">Candidate Pipeline</h3>
           <div className="space-y-2">
@@ -148,7 +177,38 @@ export default async function DashboardPage() {
             ))}
           </div>
         </Card>
+
+        <Card>
+          <h3 className="text-sm font-semibold text-zinc-900 mb-3">Submission Funnel</h3>
+          <div className="space-y-2">
+            {submissionStatuses.map((s) => (
+              <div key={s} className="flex items-center justify-between">
+                <SubmissionStatusBadge status={s} />
+                <span className="text-sm font-medium text-zinc-700">{submissionFunnel[s] ?? 0}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
+
+      {/* Revenue by company */}
+      {revenueByCompany.length > 0 && (
+        <div className="mt-6">
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Revenue by Company</h3>
+            <div className="space-y-2">
+              {revenueByCompany.slice(0, 5).map((item) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-700 truncate">{item.name}</span>
+                  <span className="text-sm font-medium text-zinc-900">
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(item.revenue)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Recent activity + recent jobs + follow-ups */}
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -207,6 +267,30 @@ export default async function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* Overdue tasks */}
+      {overdueTasks.length > 0 && (
+        <div className="mt-6">
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Overdue Tasks</h3>
+            <div className="divide-y divide-zinc-100">
+              {overdueTasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-900">{task.title}</p>
+                    <p className="text-xs text-red-600">
+                      Due {task.due_date ? new Date(task.due_date).toLocaleDateString() : "—"}
+                    </p>
+                  </div>
+                  <Link href="/tasks" className="text-xs text-zinc-500 hover:text-zinc-700 underline shrink-0">
+                    View
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
