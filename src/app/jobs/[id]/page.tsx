@@ -1,10 +1,14 @@
 import { getJob, updateJobStatus } from "@/actions/jobs";
 import { getPlacementsByJob } from "@/actions/placements";
+import { getMatchesForJob } from "@/actions/matching";
+import { getEntityActivity } from "@/actions/activity";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { StatusBadge, PriorityBadge, Badge } from "@/components/ui/badge";
+import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
+import { CandidateMatchList } from "@/components/match-list";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
@@ -45,7 +49,11 @@ export default async function JobDetailPage({
     );
   }
 
-  const placements = await getPlacementsByJob(id);
+  const [placements, matches, activity] = await Promise.all([
+    getPlacementsByJob(id),
+    job.status === "open" ? getMatchesForJob(id) : Promise.resolve([]),
+    getEntityActivity("job", id),
+  ]);
 
   const currentStatus = job.status;
 
@@ -157,6 +165,15 @@ export default async function JobDetailPage({
             </Card>
           )}
 
+          {job.status === "open" && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">
+                Top Candidate Matches
+              </h3>
+              <CandidateMatchList matches={matches} />
+            </Card>
+          )}
+
           <Card>
             <h3 className="text-sm font-semibold text-zinc-900 mb-4">
               Assigned Candidates ({placements.length})
@@ -189,6 +206,13 @@ export default async function JobDetailPage({
               </div>
             )}
           </Card>
+
+          {activity.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Activity</h3>
+              <ActivityTimeline events={activity} />
+            </Card>
+          )}
         </div>
       </div>
     </>

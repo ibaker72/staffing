@@ -1,12 +1,15 @@
-import { getCompany, updateCompanyStatus } from "@/actions/companies";
+import { getCompany, updateCompanyStatus, updateCompanyOutreach } from "@/actions/companies";
 import { getJobsByCompany } from "@/actions/jobs";
+import { getEntityActivity } from "@/actions/activity";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
+import { OutreachPanel } from "@/components/outreach-panel";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { revalidatePath } from "next/cache";
-import type { CompanyStatus } from "@/types/database";
+import type { CompanyStatus, OutreachStatus } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +37,21 @@ export default async function CompanyDetailPage({
     );
   }
 
-  const jobs = await getJobsByCompany(id);
+  const [jobs, activity] = await Promise.all([
+    getJobsByCompany(id),
+    getEntityActivity("company", id),
+  ]);
 
   async function changeStatus(formData: FormData) {
     "use server";
     const status = formData.get("status") as CompanyStatus;
     await updateCompanyStatus(id, status);
+    revalidatePath(`/companies/${id}`);
+  }
+
+  async function handleOutreachUpdate(_id: string, outreachStatus: OutreachStatus, followUpDate: string | null) {
+    "use server";
+    await updateCompanyOutreach(id, outreachStatus, followUpDate);
     revalidatePath(`/companies/${id}`);
   }
 
@@ -93,6 +105,14 @@ export default async function CompanyDetailPage({
                   <dd className="text-zinc-900">{company.contact_phone}</dd>
                 </div>
               )}
+              {company.last_contacted_at && (
+                <div>
+                  <dt className="text-zinc-500">Last Contacted</dt>
+                  <dd className="text-zinc-900">
+                    {new Date(company.last_contacted_at).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-zinc-500">Added</dt>
                 <dd className="text-zinc-900">
@@ -118,6 +138,16 @@ export default async function CompanyDetailPage({
                 </form>
               ))}
             </div>
+          </Card>
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Outreach</h3>
+            <OutreachPanel
+              entityId={id}
+              currentStatus={company.outreach_status}
+              currentFollowUp={company.follow_up_date}
+              onUpdate={handleOutreachUpdate}
+            />
           </Card>
         </div>
 
@@ -158,6 +188,13 @@ export default async function CompanyDetailPage({
               </div>
             )}
           </Card>
+
+          {activity.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Activity</h3>
+              <ActivityTimeline events={activity} />
+            </Card>
+          )}
         </div>
       </div>
     </>

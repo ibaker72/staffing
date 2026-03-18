@@ -6,6 +6,7 @@ import {
   safeMetricQuery,
 } from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "./activity";
 import type { Job, JobStatus, JobPriority, EmploymentType, PayType } from "@/types/database";
 
 export type JobWithCompany = Job & { company: { id: string; name: string } | null };
@@ -75,10 +76,11 @@ export async function getJob(id: string): Promise<JobWithCompany | null> {
 
 export async function createJob(formData: FormData) {
   const supabase = await createClient();
+  const title = formData.get("title") as string;
 
-  const { error } = await supabase.from("jobs").insert({
+  const { data, error } = await supabase.from("jobs").insert({
     company_id: formData.get("company_id") as string,
-    title: formData.get("title") as string,
+    title,
     description: (formData.get("description") as string) || null,
     location: (formData.get("location") as string) || null,
     salary_range: (formData.get("salary_range") as string) || null,
@@ -86,18 +88,25 @@ export async function createJob(formData: FormData) {
     urgency_notes: (formData.get("urgency_notes") as string) || null,
     employment_type: (formData.get("employment_type") as EmploymentType) || "full_time",
     pay_type: (formData.get("pay_type") as PayType) || "salary",
-  });
+  }).select("id").single();
 
   if (error) {
     console.error("[createJob] Supabase error:", error.message);
     throw new Error("Failed to create job. Please try again.");
   }
+
+  if (data?.id) {
+    await logActivity("job", data.id, "created", `Job "${title}" created`);
+  }
+
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
 }
 
 export async function updateJobStatus(id: string, status: JobStatus) {
   const supabase = await createClient();
+
+  const { data: current } = await supabase.from("jobs").select("title, status").eq("id", id).maybeSingle();
 
   const { error } = await supabase
     .from("jobs")
@@ -108,6 +117,14 @@ export async function updateJobStatus(id: string, status: JobStatus) {
     console.error("[updateJobStatus] Supabase error:", error.message);
     throw new Error("Failed to update job status. Please try again.");
   }
+
+  if (current) {
+    await logActivity("job", id, "status_change",
+      `Job "${current.title}" ${status === "closed" ? "closed" : "reopened"}`,
+      { from: current.status, to: status }
+    );
+  }
+
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${id}`);
   revalidatePath("/dashboard");
@@ -148,5 +165,36 @@ export async function getJobsByCompany(companyId: string): Promise<Job[]> {
   } catch (e) {
     console.error("[getJobsByCompany] Unexpected error:", e);
     return [];
+  }
+}
+
+export async function getRecentJobs(limit = 5): Promise<JobWithCompany[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*, company:companies(id, name)")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return [];
+    return (data ?? []) as JobWithCompany[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getJobStatusBreakdown(): Promise<Record<string, number>> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("jobs").select("status");
+    if (error) return {};
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
+    }
+    return counts;
+  } catch {
+    return {};
   }
 }

@@ -6,6 +6,7 @@ import {
   safeMetricQuery,
 } from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "./activity";
 import type { Placement, PlacementStatus } from "@/types/database";
 
 export type PlacementWithRelations = Placement & {
@@ -63,25 +64,36 @@ export async function createPlacement(formData: FormData) {
 
   const fee = parseFloat(formData.get("placement_fee") as string) || 0;
 
-  const { error } = await supabase.from("placements").insert({
+  const { data, error } = await supabase.from("placements").insert({
     candidate_id: formData.get("candidate_id") as string,
     job_id: formData.get("job_id") as string,
     company_id: formData.get("company_id") as string,
     placement_fee: fee,
     notes: (formData.get("notes") as string) || null,
     start_date: (formData.get("start_date") as string) || null,
-  });
+  }).select("id").single();
 
   if (error) {
     console.error("[createPlacement] Supabase error:", error.message);
     throw new Error("Failed to create placement. Please try again.");
   }
+
+  if (data?.id) {
+    await logActivity("placement", data.id, "created", `New placement created`);
+  }
+
   revalidatePath("/placements");
   revalidatePath("/dashboard");
 }
 
 export async function updatePlacementStatus(id: string, status: PlacementStatus) {
   const supabase = await createClient();
+
+  const { data: current } = await supabase
+    .from("placements")
+    .select("status, candidate:candidates(full_name), job:jobs(title)")
+    .eq("id", id)
+    .maybeSingle();
 
   const updateData: Record<string, unknown> = { status };
   if (status === "hired") {
@@ -99,6 +111,14 @@ export async function updatePlacementStatus(id: string, status: PlacementStatus)
     console.error("[updatePlacementStatus] Supabase error:", error.message);
     throw new Error("Failed to update placement status. Please try again.");
   }
+
+  const candidateName = (current?.candidate as { full_name?: string } | null)?.full_name ?? "Unknown";
+  const jobTitle = (current?.job as { title?: string } | null)?.title ?? "Unknown";
+  await logActivity("placement", id, "status_change",
+    `Placement for ${candidateName} at "${jobTitle}" marked as ${status}`,
+    { from: current?.status, to: status }
+  );
+
   revalidatePath("/placements");
   revalidatePath("/dashboard");
 }
@@ -144,5 +164,20 @@ export async function getPlacementsByJob(jobId: string): Promise<PlacementWithCa
   } catch (e) {
     console.error("[getPlacementsByJob] Unexpected error:", e);
     return [];
+  }
+}
+
+export async function getPlacementStatusBreakdown(): Promise<Record<string, number>> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("placements").select("status");
+    if (error) return {};
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
+    }
+    return counts;
+  } catch {
+    return {};
   }
 }

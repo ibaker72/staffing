@@ -6,7 +6,8 @@ import {
   safeMetricQuery,
 } from "@/lib/supabase/metric-query";
 import { revalidatePath } from "next/cache";
-import type { Company, CompanyStatus } from "@/types/database";
+import { logActivity } from "./activity";
+import type { Company, CompanyStatus, OutreachStatus } from "@/types/database";
 
 export interface CompanyFilters {
   search?: string;
@@ -70,8 +71,10 @@ export async function getCompany(id: string): Promise<Company | null> {
 export async function createCompany(formData: FormData) {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("companies").insert({
-    name: formData.get("name") as string,
+  const name = formData.get("name") as string;
+
+  const { data, error } = await supabase.from("companies").insert({
+    name,
     website: (formData.get("website") as string) || null,
     industry: (formData.get("industry") as string) || null,
     location: (formData.get("location") as string) || null,
@@ -80,12 +83,17 @@ export async function createCompany(formData: FormData) {
     contact_phone: (formData.get("contact_phone") as string) || null,
     notes: (formData.get("notes") as string) || null,
     status: (formData.get("status") as CompanyStatus) || "lead",
-  });
+  }).select("id").single();
 
   if (error) {
     console.error("[createCompany] Supabase error:", error.message);
     throw new Error("Failed to create company. Please try again.");
   }
+
+  if (data?.id) {
+    await logActivity("company", data.id, "created", `Company "${name}" created`);
+  }
+
   revalidatePath("/companies");
   revalidatePath("/dashboard");
 }
@@ -119,6 +127,9 @@ export async function updateCompany(id: string, formData: FormData) {
 export async function updateCompanyStatus(id: string, status: CompanyStatus) {
   const supabase = await createClient();
 
+  // Get current for logging
+  const { data: current } = await supabase.from("companies").select("name, status").eq("id", id).maybeSingle();
+
   const { error } = await supabase
     .from("companies")
     .update({ status })
@@ -128,8 +139,78 @@ export async function updateCompanyStatus(id: string, status: CompanyStatus) {
     console.error("[updateCompanyStatus] Supabase error:", error.message);
     throw new Error("Failed to update company status. Please try again.");
   }
+
+  if (current) {
+    await logActivity("company", id, "status_change",
+      `Status changed from "${current.status}" to "${status}" for ${current.name}`,
+      { from: current.status, to: status }
+    );
+  }
+
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);
+  revalidatePath("/dashboard");
+}
+
+export async function updateCompanyOutreach(
+  id: string,
+  outreachStatus: OutreachStatus,
+  followUpDate: string | null
+) {
+  const supabase = await createClient();
+
+  const { data: current } = await supabase.from("companies").select("name, outreach_status").eq("id", id).maybeSingle();
+
+  const updateData: Record<string, unknown> = {
+    outreach_status: outreachStatus,
+    follow_up_date: followUpDate || null,
+  };
+
+  if (outreachStatus !== "none") {
+    updateData.last_contacted_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .update(updateData)
+    .eq("id", id);
+
+  if (error) {
+    console.error("[updateCompanyOutreach] Supabase error:", error.message);
+    throw new Error("Failed to update outreach status. Please try again.");
+  }
+
+  if (current) {
+    await logActivity("company", id, "outreach_update",
+      `Outreach updated to "${outreachStatus}" for ${current.name}`,
+      { from: current.outreach_status, to: outreachStatus, follow_up_date: followUpDate }
+    );
+  }
+
+  revalidatePath("/companies");
+  revalidatePath(`/companies/${id}`);
+  revalidatePath("/dashboard");
+}
+
+export async function getUpcomingFollowUps(): Promise<Company[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("companies")
+      .select("*")
+      .not("follow_up_date", "is", null)
+      .order("follow_up_date", { ascending: true })
+      .limit(10);
+
+    if (error) {
+      console.error("[getUpcomingFollowUps] Supabase error:", error.message);
+      return [];
+    }
+    return (data ?? []) as Company[];
+  } catch (e) {
+    console.error("[getUpcomingFollowUps] Unexpected error:", e);
+    return [];
+  }
 }
 
 export async function getCompanyCount(): Promise<number> {

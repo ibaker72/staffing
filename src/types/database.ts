@@ -5,6 +5,7 @@ export type CompanyStatus = "lead" | "active" | "inactive";
 export type JobPriority = "low" | "medium" | "high";
 export type EmploymentType = "full_time" | "part_time" | "contract" | "temp_to_hire";
 export type PayType = "hourly" | "salary" | "per_diem";
+export type OutreachStatus = "none" | "initial_contact" | "follow_up" | "in_conversation" | "nurturing" | "closed";
 
 export interface Company {
   id: string;
@@ -17,6 +18,9 @@ export interface Company {
   contact_phone: string | null;
   notes: string | null;
   status: CompanyStatus;
+  outreach_status: OutreachStatus;
+  follow_up_date: string | null;
+  last_contacted_at: string | null;
   created_at: string;
 }
 
@@ -34,6 +38,8 @@ export interface Candidate {
   desired_salary: number | null;
   resume_url: string | null;
   last_contacted_at: string | null;
+  outreach_status: OutreachStatus;
+  follow_up_date: string | null;
   created_at: string;
 }
 
@@ -66,6 +72,16 @@ export interface Placement {
   created_at: string;
 }
 
+export interface ActivityEvent {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  event_type: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 // Supabase Database type for typed client
 export interface Database {
   public: {
@@ -82,6 +98,9 @@ export interface Database {
           contact_phone: string | null;
           notes: string | null;
           status: CompanyStatus;
+          outreach_status: OutreachStatus;
+          follow_up_date: string | null;
+          last_contacted_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -95,6 +114,9 @@ export interface Database {
           contact_phone?: string | null;
           notes?: string | null;
           status?: CompanyStatus;
+          outreach_status?: OutreachStatus;
+          follow_up_date?: string | null;
+          last_contacted_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -108,6 +130,9 @@ export interface Database {
           contact_phone?: string | null;
           notes?: string | null;
           status?: CompanyStatus;
+          outreach_status?: OutreachStatus;
+          follow_up_date?: string | null;
+          last_contacted_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -127,6 +152,8 @@ export interface Database {
           desired_salary: number | null;
           resume_url: string | null;
           last_contacted_at: string | null;
+          outreach_status: OutreachStatus;
+          follow_up_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -143,6 +170,8 @@ export interface Database {
           desired_salary?: number | null;
           resume_url?: string | null;
           last_contacted_at?: string | null;
+          outreach_status?: OutreachStatus;
+          follow_up_date?: string | null;
           created_at?: string;
         };
         Update: {
@@ -159,6 +188,8 @@ export interface Database {
           desired_salary?: number | null;
           resume_url?: string | null;
           last_contacted_at?: string | null;
+          outreach_status?: OutreachStatus;
+          follow_up_date?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -280,6 +311,36 @@ export interface Database {
           },
         ];
       };
+      activity_events: {
+        Row: {
+          id: string;
+          entity_type: string;
+          entity_id: string;
+          event_type: string;
+          description: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_type: string;
+          entity_id: string;
+          event_type: string;
+          description: string;
+          metadata?: Record<string, unknown>;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_type?: string;
+          entity_id?: string;
+          event_type?: string;
+          description?: string;
+          metadata?: Record<string, unknown>;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -291,6 +352,7 @@ export interface Database {
       job_priority: JobPriority;
       employment_type: EmploymentType;
       pay_type: PayType;
+      outreach_status: OutreachStatus;
     };
     CompositeTypes: Record<string, never>;
   };

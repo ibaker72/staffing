@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "./activity";
 
 export async function uploadResume(candidateId: string, formData: FormData) {
   const file = formData.get("resume") as File;
@@ -52,6 +53,11 @@ export async function uploadResume(candidateId: string, formData: FormData) {
     throw new Error("File uploaded but failed to link to candidate.");
   }
 
+  await logActivity("candidate", candidateId, "resume_upload",
+    `Resume uploaded: ${file.name}`,
+    { filename: file.name, size: file.size, type: file.type }
+  );
+
   revalidatePath(`/candidates/${candidateId}`);
   revalidatePath("/candidates");
 
@@ -76,6 +82,8 @@ export async function deleteResume(candidateId: string, resumeUrl: string) {
     console.error("[deleteResume] DB update error:", error.message);
     throw new Error("Failed to remove resume link.");
   }
+
+  await logActivity("candidate", candidateId, "resume_upload", "Resume removed");
 
   revalidatePath(`/candidates/${candidateId}`);
   revalidatePath("/candidates");

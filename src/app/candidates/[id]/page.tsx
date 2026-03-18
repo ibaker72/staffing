@@ -1,12 +1,17 @@
-import { getCandidate, updateCandidateStatus } from "@/actions/candidates";
+import { getCandidate, updateCandidateStatus, updateCandidateOutreach } from "@/actions/candidates";
+import { getMatchesForCandidate } from "@/actions/matching";
+import { getEntityActivity } from "@/actions/activity";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NotFoundState } from "@/components/ui/error-state";
 import { ResumeUpload } from "@/components/resume-upload";
+import { OutreachPanel } from "@/components/outreach-panel";
+import { JobMatchList } from "@/components/match-list";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { revalidatePath } from "next/cache";
-import type { CandidateStatus } from "@/types/database";
+import type { CandidateStatus, OutreachStatus } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +39,23 @@ export default async function CandidateDetailPage({
     );
   }
 
+  const isAvailable = candidate.status !== "placed" && candidate.status !== "rejected";
+
+  const [matches, activity] = await Promise.all([
+    isAvailable ? getMatchesForCandidate(id) : Promise.resolve([]),
+    getEntityActivity("candidate", id),
+  ]);
+
   async function changeStatus(formData: FormData) {
     "use server";
     const status = formData.get("status") as CandidateStatus;
     await updateCandidateStatus(id, status);
+    revalidatePath(`/candidates/${id}`);
+  }
+
+  async function handleOutreachUpdate(_id: string, outreachStatus: OutreachStatus, followUpDate: string | null) {
+    "use server";
+    await updateCandidateOutreach(id, outreachStatus, followUpDate);
     revalidatePath(`/candidates/${id}`);
   }
 
@@ -111,6 +129,16 @@ export default async function CandidateDetailPage({
               </div>
             </dl>
           </Card>
+
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Outreach</h3>
+            <OutreachPanel
+              entityId={id}
+              currentStatus={candidate.outreach_status}
+              currentFollowUp={candidate.follow_up_date}
+              onUpdate={handleOutreachUpdate}
+            />
+          </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -122,6 +150,13 @@ export default async function CandidateDetailPage({
                   <Badge key={skill}>{skill}</Badge>
                 ))}
               </div>
+            </Card>
+          )}
+
+          {isAvailable && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Top Job Matches</h3>
+              <JobMatchList matches={matches} />
             </Card>
           )}
 
@@ -156,6 +191,13 @@ export default async function CandidateDetailPage({
               ))}
             </div>
           </Card>
+
+          {activity.length > 0 && (
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">Activity</h3>
+              <ActivityTimeline events={activity} />
+            </Card>
+          )}
         </div>
       </div>
     </>
