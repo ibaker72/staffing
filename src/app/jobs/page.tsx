@@ -1,22 +1,13 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { getJobs, type JobFilters } from "@/actions/jobs";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/button";
-import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";
+import { JobListWithBulk } from "@/components/job-list-bulk";
 import type { JobStatus, JobPriority } from "@/types/database";
 
 export const dynamic = "force-dynamic";
-
-const employmentLabels: Record<string, string> = {
-  full_time: "Full-Time",
-  part_time: "Part-Time",
-  contract: "Contract",
-  temp_to_hire: "Temp-to-Hire",
-};
 
 export default async function JobsPage({
   searchParams,
@@ -81,29 +72,7 @@ export default async function JobsPage({
           action={!hasFilters ? <LinkButton href="/jobs/new">Create Job</LinkButton> : undefined}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {jobs.map((job) => (
-            <Link key={job.id} href={`/jobs/${job.id}`}>
-              <Card className="hover:border-zinc-300 hover:shadow-md transition-all cursor-pointer">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-zinc-900">{job.title}</h3>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <PriorityBadge priority={job.priority} />
-                    <StatusBadge status={job.status} />
-                  </div>
-                </div>
-                <p className="mt-1 text-sm text-zinc-500">
-                  {job.company?.name ?? "Unknown Company"}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-400">
-                  {job.location && <span>{job.location}</span>}
-                  {job.salary_range && <span>{job.salary_range}</span>}
-                  <span>{employmentLabels[job.employment_type] ?? job.employment_type}</span>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <JobListWithBulk jobs={jobs} />
       )}
     </>
   );

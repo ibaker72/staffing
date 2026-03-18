@@ -1,12 +1,10 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { getCompanies, type CompanyFilters } from "@/actions/companies";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";
+import { CompanyListWithBulk } from "@/components/company-list-bulk";
 import type { CompanyStatus } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -64,26 +62,7 @@ export default async function CompaniesPage({
           action={!hasFilters ? <LinkButton href="/companies/new">Add Company</LinkButton> : undefined}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {companies.map((company) => (
-            <Link key={company.id} href={`/companies/${company.id}`}>
-              <Card className="hover:border-zinc-300 hover:shadow-md transition-all cursor-pointer">
-                <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-zinc-900">{company.name}</h3>
-                  <StatusBadge status={company.status} />
-                </div>
-                {company.industry && (
-                  <p className="mt-1 text-sm text-zinc-500">{company.industry}</p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-400">
-                  {company.location && <span>{company.location}</span>}
-                  {company.contact_name && <span>{company.contact_name}</span>}
-                  {company.contact_email && <span>{company.contact_email}</span>}
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <CompanyListWithBulk companies={companies} />
       )}
     </>
   );

@@ -11,7 +11,7 @@ import { getCandidateCountMetric, getCandidateStatusBreakdown, getUpcomingCandid
 import { getOpenJobCountMetric, getRecentJobs, getJobStatusBreakdown, getMyJobs } from "@/actions/jobs";
 import { getTotalRevenueMetric, getPlacementStatusBreakdown } from "@/actions/placements";
 import { getRecentActivity } from "@/actions/activity";
-import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount } from "@/actions/reporting";
+import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount, getMyStaleJobs, getMyFollowUpsDue, getSubmissionAging, getDataHygieneWarnings } from "@/actions/reporting";
 import { getOverdueTasks, getMyTasks } from "@/actions/tasks";
 import { getCurrentUser } from "@/lib/auth";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
@@ -39,6 +39,10 @@ export default async function DashboardPage() {
     myJobs,
     myCandidates,
     myTasks,
+    myStaleJobs,
+    myFollowUpsDue,
+    submissionAging,
+    dataHygieneWarnings,
   ] = await Promise.all([
     Promise.allSettled([
       getCompanyCountMetric(),
@@ -62,6 +66,10 @@ export default async function DashboardPage() {
     currentUser ? getMyJobs(currentUser.id) : Promise.resolve([]),
     currentUser ? getMyCandidates(currentUser.id) : Promise.resolve([]),
     currentUser ? getMyTasks(currentUser.id) : Promise.resolve([]),
+    currentUser ? getMyStaleJobs(currentUser.id) : Promise.resolve([]),
+    currentUser ? getMyFollowUpsDue(currentUser.id) : Promise.resolve([]),
+    getSubmissionAging(),
+    getDataHygieneWarnings(),
   ]);
 
   const metricTables = ["companies", "candidates", "jobs", "placements"];
@@ -357,6 +365,115 @@ export default async function DashboardPage() {
                   </Link>
                 </div>
               ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Operations section */}
+      {currentUser && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-zinc-900 mb-3">Operations</h2>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {/* My stale jobs */}
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">
+                My Stale Jobs
+                {myStaleJobs.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-red-500">{myStaleJobs.length}</span>
+                )}
+              </h3>
+              {myStaleJobs.length === 0 ? (
+                <p className="text-xs text-zinc-500">No stale jobs. Nice work!</p>
+              ) : (
+                <div className="divide-y divide-zinc-100">
+                  {myStaleJobs.slice(0, 5).map((job) => (
+                    <Link key={job.id} href={`/jobs/${job.id}`} className="block py-2 first:pt-0 last:pb-0 hover:bg-zinc-50 -mx-1 px-1 rounded">
+                      <p className="text-sm font-medium text-zinc-900 truncate">{job.title}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500">{job.companyName}</span>
+                        <span className="text-[10px] text-red-500">{job.daysSinceCreated}d old, 0 subs</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* My follow-ups due */}
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">
+                Follow-ups Due
+                {myFollowUpsDue.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-amber-500">{myFollowUpsDue.length}</span>
+                )}
+              </h3>
+              {myFollowUpsDue.length === 0 ? (
+                <p className="text-xs text-zinc-500">No follow-ups due today.</p>
+              ) : (
+                <div className="divide-y divide-zinc-100">
+                  {myFollowUpsDue.slice(0, 5).map((item) => (
+                    <Link
+                      key={item.id}
+                      href={`/${item.type === "company" ? "companies" : "candidates"}/${item.id}`}
+                      className="block py-2 first:pt-0 last:pb-0 hover:bg-zinc-50 -mx-1 px-1 rounded"
+                    >
+                      <p className="text-sm font-medium text-zinc-900 truncate">{item.name}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 capitalize">{item.type}</span>
+                        <span className={`text-[10px] font-medium ${item.isOverdue ? "text-red-600" : "text-amber-500"}`}>
+                          {item.isOverdue ? "Overdue" : "Due today"}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Data hygiene */}
+            <Card>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">Data Hygiene</h3>
+              {dataHygieneWarnings.length === 0 ? (
+                <p className="text-xs text-zinc-500">All records look clean!</p>
+              ) : (
+                <div className="space-y-2">
+                  {dataHygieneWarnings.map((w, i) => (
+                    <Link key={i} href={`/${w.type}`} className="flex items-center justify-between py-1 hover:bg-zinc-50 -mx-1 px-1 rounded">
+                      <span className="text-xs text-zinc-700">{w.description}</span>
+                      <span className="text-xs font-medium text-amber-600">{w.count}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Submission aging */}
+      {submissionAging.length > 0 && (
+        <div className="mt-4">
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-3">Submission Aging</h3>
+            <div className="divide-y divide-zinc-100">
+              {submissionAging.slice(0, 8).map((s) => {
+                const agingColor = s.daysAging > 7 ? "bg-red-100 text-red-700" : s.daysAging > 3 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
+                return (
+                  <div key={s.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-900 truncate">{s.candidateName}</p>
+                      <p className="text-xs text-zinc-500 truncate">{s.jobTitle}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <StatusBadge status={s.status as "open"} />
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${agingColor}`}>
+                        {s.daysAging}d
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
