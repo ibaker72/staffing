@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     candidatesMetric,
     openJobsMetric,
     revenueMetric,
-  ]);
+  ];
 
   const hasMetricErrors = metrics.some((metric) => metric.hasError);
   const missingTables = Array.from(
