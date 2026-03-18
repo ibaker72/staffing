@@ -2,6 +2,7 @@ import { getTasks, createTask, completeTask, reopenTask, deleteTask } from "@/ac
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import type { TaskPriority } from "@/types/database";
@@ -162,12 +163,12 @@ export default async function TasksPage({
                         </Button>
                       </form>
                     )}
-                    <form action={handleDelete}>
-                      <input type="hidden" name="id" value={task.id} />
-                      <Button type="submit" variant="ghost" className="text-xs px-2 py-1 text-red-500 hover:text-red-700">
-                        ×
-                      </Button>
-                    </form>
+                    <ConfirmDeleteButton
+                      action={handleDelete}
+                      hiddenFields={{ id: task.id }}
+                      title="Delete task?"
+                      description={`Are you sure you want to delete "${task.title}"? This cannot be undone.`}
+                    />
                   </div>
                 </div>
               );

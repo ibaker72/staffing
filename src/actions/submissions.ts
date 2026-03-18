@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./activity";
 import type { CandidateSubmission, SubmissionStatus } from "@/types/database";
+import { notifyCandidateSubmittedToClient } from "./notifications";
 
 export type SubmissionWithCandidate = CandidateSubmission & {
   candidate: { id: string; full_name: string; email: string | null; location: string | null } | null;
@@ -90,6 +91,25 @@ export async function createSubmission(formData: FormData) {
       candidate_id: candidateId,
       job_id: jobId,
     });
+
+    // Get candidate name and job title for notification
+    const { data: candidate } = await supabase
+      .from("candidates")
+      .select("full_name")
+      .eq("id", candidateId)
+      .maybeSingle();
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("title")
+      .eq("id", jobId)
+      .maybeSingle();
+
+    // Fire-and-forget email to client
+    notifyCandidateSubmittedToClient(
+      jobId,
+      (candidate as { full_name?: string } | null)?.full_name ?? "A candidate",
+      (job as { title?: string } | null)?.title ?? "a position"
+    );
   }
 
   revalidatePath(`/jobs/${jobId}`);

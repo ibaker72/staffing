@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { SubmissionStatusBadge } from "@/components/submission-list";
 import { PortalFeedbackForm } from "@/components/portal-feedback-form";
 import { revalidatePath } from "next/cache";
+import { notifyClientFeedbackReceived } from "@/actions/notifications";
 import type { SubmissionStatus } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -69,10 +70,17 @@ export default async function ClientDashboard() {
       .from("candidate_submissions")
       .update(updateData)
       .eq("id", submissionId);
+
+    // Fire-and-forget notification to recruiter
+    notifyClientFeedbackReceived(submissionId, status, feedback);
+
     revalidatePath("/client");
   }
 
   const companyName = companies?.[0]?.name ?? "Your Company";
+  const pendingReview = (submissions ?? []).filter((s) =>
+    ["submitted", "client_review"].includes(s.status)
+  ).length;
 
   return (
     <>
@@ -81,13 +89,29 @@ export default async function ClientDashboard() {
         <p className="text-sm text-zinc-500">Your open positions and submitted candidates</p>
       </div>
 
+      {/* Quick stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <Card className="text-center py-4">
+          <p className="text-2xl font-bold text-zinc-900">{jobs?.length ?? 0}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Open Positions</p>
+        </Card>
+        <Card className="text-center py-4">
+          <p className="text-2xl font-bold text-zinc-900">{submissions?.length ?? 0}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Candidates</p>
+        </Card>
+        <Card className="text-center py-4">
+          <p className={`text-2xl font-bold ${pendingReview > 0 ? "text-amber-600" : "text-zinc-900"}`}>{pendingReview}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Awaiting Review</p>
+        </Card>
+      </div>
+
       <div className="space-y-6">
         <Card>
           <h3 className="text-sm font-semibold text-zinc-900 mb-4">
-            Open Positions ({jobs?.length ?? 0})
+            Open Positions
           </h3>
           {!jobs || jobs.length === 0 ? (
-            <p className="text-sm text-zinc-500">No open positions currently.</p>
+            <p className="text-sm text-zinc-500">No open positions currently. Your recruiter will add positions as they become available.</p>
           ) : (
             <div className="divide-y divide-zinc-100">
               {jobs.map((job) => (
@@ -109,30 +133,39 @@ export default async function ClientDashboard() {
 
         <Card>
           <h3 className="text-sm font-semibold text-zinc-900 mb-4">
-            Submitted Candidates ({submissions?.length ?? 0})
+            Submitted Candidates
           </h3>
           {!submissions || submissions.length === 0 ? (
-            <p className="text-sm text-zinc-500">No candidates have been submitted yet.</p>
+            <div className="text-center py-8">
+              <p className="text-sm text-zinc-500">No candidates have been submitted yet.</p>
+              <p className="text-xs text-zinc-400 mt-1">Your recruiter will submit candidates for your review as they find matches.</p>
+            </div>
           ) : (
-            <div className="divide-y divide-zinc-100">
+            <div className="space-y-3">
               {submissions.map((sub) => {
                 const candidate = sub.candidate as { full_name: string; location: string | null } | null;
                 const job = sub.job as { id: string; title: string } | null;
+                const needsReview = ["submitted", "client_review"].includes(sub.status);
                 return (
-                  <div key={sub.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="text-sm font-medium text-zinc-900">{candidate?.full_name ?? "Unknown"}</p>
-                        <p className="text-xs text-zinc-500">
-                          For: {job?.title ?? "Unknown"} · {candidate?.location ?? "—"}
-                        </p>
-                      </div>
+                  <div
+                    key={sub.id}
+                    className={`rounded-lg border p-4 ${
+                      needsReview ? "border-amber-200 bg-amber-50/50" : "border-zinc-100"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium text-zinc-900">{candidate?.full_name ?? "Unknown"}</p>
                       <SubmissionStatusBadge status={sub.status} />
                     </div>
+                    <p className="text-xs text-zinc-500 mb-2">
+                      For: {job?.title ?? "Unknown"}{candidate?.location ? ` · ${candidate.location}` : ""}
+                    </p>
                     {sub.client_feedback && (
-                      <p className="text-xs text-zinc-500 mb-2">
-                        <span className="font-medium">Your feedback:</span> {sub.client_feedback}
-                      </p>
+                      <div className="rounded bg-zinc-50 border border-zinc-100 px-3 py-2 mb-2">
+                        <p className="text-xs text-zinc-600">
+                          <span className="font-medium">Your feedback:</span> {sub.client_feedback}
+                        </p>
+                      </div>
                     )}
                     <PortalFeedbackForm
                       submissionId={sub.id}

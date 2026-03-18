@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ClientInvitation } from "@/types/database";
+import { notifyClientInvitation } from "./notifications";
 
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
@@ -154,6 +155,26 @@ export async function inviteClient(formData: FormData) {
     console.error("[inviteClient] Supabase error:", error.message);
     throw new Error("Failed to create invitation.");
   }
+
+  // Get company name and inviter name for the notification email
+  const { data: company } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .maybeSingle();
+  const { data: inviter } = await supabase
+    .from("user_profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // Fire-and-forget email notification
+  notifyClientInvitation(
+    email,
+    (company as { name?: string } | null)?.name ?? "Your Company",
+    (inviter as { full_name?: string } | null)?.full_name ?? "A team member",
+    data.token as string
+  );
 
   revalidatePath(`/companies/${companyId}`);
   return { token: data.token };

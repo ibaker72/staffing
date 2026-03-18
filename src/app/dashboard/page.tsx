@@ -14,6 +14,7 @@ import { getRecentActivity } from "@/actions/activity";
 import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount } from "@/actions/reporting";
 import { getOverdueTasks, getMyTasks } from "@/actions/tasks";
 import { getCurrentUser } from "@/lib/auth";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
 export const dynamic = "force-dynamic";
@@ -114,6 +115,9 @@ export default async function DashboardPage() {
         title="Dashboard"
         description="Overview of your staffing operations"
       />
+
+      {/* Onboarding checklist for new users */}
+      <OnboardingChecklist companies={companies} candidates={candidates} jobs={openJobs} />
 
       {/* My Work section */}
       {currentUser && (myJobs.length > 0 || myCandidates.length > 0 || myTasks.length > 0) && (
