@@ -72,9 +72,8 @@ export async function getCompanyCount() {
 }
 
 export async function getCompanyCountMetric(): Promise<MetricQueryResult> {
-  const supabase = await createClient();
-
   return safeMetricQuery("companies", async () => {
+    const supabase = await createClient();
     const { count, error } = await supabase
       .from("companies")
       .select("*", { count: "exact", head: true });

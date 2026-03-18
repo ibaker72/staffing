@@ -5,22 +5,35 @@ import { getCompanyCountMetric } from "@/actions/companies";
 import { getCandidateCountMetric } from "@/actions/candidates";
 import { getOpenJobCountMetric } from "@/actions/jobs";
 import { getTotalRevenueMetric } from "@/actions/placements";
+import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
 export default async function DashboardPage() {
-  const [companiesMetric, candidatesMetric, openJobsMetric, revenueMetric] =
-    await Promise.all([
-      getCompanyCountMetric(),
-      getCandidateCountMetric(),
-      getOpenJobCountMetric(),
-      getTotalRevenueMetric(),
-    ]);
+  const settledMetrics = await Promise.allSettled([
+    getCompanyCountMetric(),
+    getCandidateCountMetric(),
+    getOpenJobCountMetric(),
+    getTotalRevenueMetric(),
+  ]);
 
-  const metrics = [
-    companiesMetric,
-    candidatesMetric,
-    openJobsMetric,
-    revenueMetric,
-  ];
+  const metricTables = ["companies", "candidates", "jobs", "placements"];
+  const metrics = settledMetrics.map((result, index): MetricQueryResult => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    }
+
+    const table = metricTables[index] ?? "unknown";
+    console.error(`[dashboard] Metric promise rejected for table '${table}'`, result.reason);
+
+    return {
+      table,
+      value: 0,
+      hasError: true,
+      missingTable: false,
+      errorMessage: "Metric loader rejected",
+    };
+  });
+
+  const [companiesMetric, candidatesMetric, openJobsMetric, revenueMetric] = metrics;
 
   const hasMetricErrors = metrics.some((metric) => metric.hasError);
   const missingTables = Array.from(

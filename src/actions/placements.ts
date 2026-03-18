@@ -61,9 +61,8 @@ export async function getTotalRevenue() {
 }
 
 export async function getTotalRevenueMetric(): Promise<MetricQueryResult> {
-  const supabase = await createClient();
-
   return safeMetricQuery("placements", async () => {
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("placements")
       .select("placement_fee")

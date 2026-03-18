@@ -98,9 +98,8 @@ export async function getCandidateCount() {
 }
 
 export async function getCandidateCountMetric(): Promise<MetricQueryResult> {
-  const supabase = await createClient();
-
   return safeMetricQuery("candidates", async () => {
+    const supabase = await createClient();
     const { count, error } = await supabase
       .from("candidates")
       .select("*", { count: "exact", head: true });

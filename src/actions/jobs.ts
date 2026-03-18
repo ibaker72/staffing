@@ -67,9 +67,8 @@ export async function getOpenJobCount() {
 }
 
 export async function getOpenJobCountMetric(): Promise<MetricQueryResult> {
-  const supabase = await createClient();
-
   return safeMetricQuery("jobs", async () => {
+    const supabase = await createClient();
     const { count, error } = await supabase
       .from("jobs")
       .select("*", { count: "exact", head: true })
