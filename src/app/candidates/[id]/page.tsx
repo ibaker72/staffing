@@ -7,6 +7,8 @@ import { NotFoundState } from "@/components/ui/error-state";
 import { revalidatePath } from "next/cache";
 import type { CandidateStatus } from "@/types/database";
 
+export const dynamic = "force-dynamic";
+
 const statusFlow: CandidateStatus[] = ["new", "contacted", "interviewing", "placed", "rejected"];
 
 export default async function CandidateDetailPage({

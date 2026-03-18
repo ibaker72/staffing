@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PlacementStatusActions } from "./status-actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function PlacementsPage() {
   const placements = await getPlacements();
 

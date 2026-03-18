@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 
+export const dynamic = "force-dynamic";
+
 export default async function CompaniesPage() {
   const companies = await getCompanies();
 

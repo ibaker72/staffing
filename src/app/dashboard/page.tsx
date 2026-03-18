@@ -7,6 +7,8 @@ import { getOpenJobCountMetric } from "@/actions/jobs";
 import { getTotalRevenueMetric } from "@/actions/placements";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const settledMetrics = await Promise.allSettled([
     getCompanyCountMetric(),

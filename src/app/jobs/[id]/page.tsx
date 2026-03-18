@@ -8,6 +8,8 @@ import { NotFoundState } from "@/components/ui/error-state";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function JobDetailPage({
   params,
 }: {
