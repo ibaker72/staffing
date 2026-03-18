@@ -5,6 +5,8 @@ import { getEntityActivity } from "@/actions/activity";
 import { getSubmissionsForJob, createSubmission, updateSubmissionStatus } from "@/actions/submissions";
 import { getTasks, createTask, completeTask } from "@/actions/tasks";
 import { getCandidates } from "@/actions/candidates";
+import { HealthBadge } from "@/components/health-badge";
+import { getJobHealth } from "@/actions/data-quality";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
@@ -113,28 +115,33 @@ export default async function JobDetailPage({
 
   return (
     <>
-      <PageHeader
-        title={job.title}
-        description={job.company?.name ?? undefined}
-        action={
-          <div className="flex gap-2">
-            <LinkButton
-              href={`/placements/new?job_id=${id}&company_id=${job.company_id}`}
-              variant="secondary"
-            >
-              Assign Candidate
-            </LinkButton>
-            <form action={toggleStatus}>
-              <Button
-                type="submit"
-                variant={job.status === "open" ? "danger" : "primary"}
-              >
-                {job.status === "open" ? "Close Job" : "Reopen Job"}
-              </Button>
-            </form>
-          </div>
-        }
-      />
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <PageHeader
+            title={job.title}
+            description={job.company?.name ?? undefined}
+            action={
+              <div className="flex gap-2">
+                <LinkButton
+                  href={`/placements/new?job_id=${id}&company_id=${job.company_id}`}
+                  variant="secondary"
+                >
+                  Assign Candidate
+                </LinkButton>
+                <form action={toggleStatus}>
+                  <Button
+                    type="submit"
+                    variant={job.status === "open" ? "danger" : "primary"}
+                  >
+                    {job.status === "open" ? "Close Job" : "Reopen Job"}
+                  </Button>
+                </form>
+              </div>
+            }
+          />
+        </div>
+        <HealthBadge fetchHealth={() => getJobHealth(job.id)} showDetails={true} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">

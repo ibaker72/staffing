@@ -1,8 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./activity";
+import { writeAuditLog } from "./audit";
 
 // ---------------------------------------------------------------------------
 // Duplicate checks
@@ -164,6 +166,28 @@ export async function importCompanies(
     }
   }
 
+  // Store import log
+  try {
+    const user = await getCurrentUser();
+    const supabaseLog = await createClient();
+    await supabaseLog.from("import_logs").insert({
+      entity_type: "company",
+      total_rows: rows.length,
+      imported_count: imported,
+      error_count: errors.length,
+      errors: errors.length > 0 ? errors : null,
+      imported_by: user?.id ?? null,
+    });
+    await writeAuditLog({
+      entity_type: "company",
+      action: "import",
+      new_value: { imported, errors: errors.length },
+      metadata: { total_rows: rows.length },
+    });
+  } catch {
+    // Non-critical
+  }
+
   revalidatePath("/companies");
   revalidatePath("/dashboard");
   return { imported, errors };
@@ -229,6 +253,28 @@ export async function importCandidates(
     } catch (e) {
       errors.push({ row: i, message: e instanceof Error ? e.message : "Unknown error" });
     }
+  }
+
+  // Store import log
+  try {
+    const userForLog = await getCurrentUser();
+    const supabaseLog = await createClient();
+    await supabaseLog.from("import_logs").insert({
+      entity_type: "candidate",
+      total_rows: rows.length,
+      imported_count: imported,
+      error_count: errors.length,
+      errors: errors.length > 0 ? errors : null,
+      imported_by: userForLog?.id ?? null,
+    });
+    await writeAuditLog({
+      entity_type: "candidate",
+      action: "import",
+      new_value: { imported, errors: errors.length },
+      metadata: { total_rows: rows.length },
+    });
+  } catch {
+    // Non-critical
   }
 
   revalidatePath("/candidates");
@@ -312,6 +358,28 @@ export async function importJobs(
     } catch (e) {
       errors.push({ row: i, message: e instanceof Error ? e.message : "Unknown error" });
     }
+  }
+
+  // Store import log
+  try {
+    const userForLog = await getCurrentUser();
+    const supabaseLog = await createClient();
+    await supabaseLog.from("import_logs").insert({
+      entity_type: "job",
+      total_rows: rows.length,
+      imported_count: imported,
+      error_count: errors.length,
+      errors: errors.length > 0 ? errors : null,
+      imported_by: userForLog?.id ?? null,
+    });
+    await writeAuditLog({
+      entity_type: "job",
+      action: "import",
+      new_value: { imported, errors: errors.length },
+      metadata: { total_rows: rows.length },
+    });
+  } catch {
+    // Non-critical
   }
 
   revalidatePath("/jobs");

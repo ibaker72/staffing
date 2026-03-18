@@ -1,248 +1,376 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-// Run all automation rules - called from dashboard or on-demand
-export async function runAutomations(): Promise<{
-  followUpTasks: number;
-  staleSubmissionReminders: number;
-  staleJobFlags: number;
-  staleCandidateFlags: number;
-}> {
-  const results = await Promise.all([
-    createFollowUpTasks(),
-    createStaleSubmissionReminders(),
-    flagStaleJobs(),
-    flagStaleCandidates(),
-  ]);
-
-  revalidatePath("/tasks");
-  revalidatePath("/dashboard");
-  revalidatePath("/jobs");
-  revalidatePath("/candidates");
-
-  return {
-    followUpTasks: results[0],
-    staleSubmissionReminders: results[1],
-    staleJobFlags: results[2],
-    staleCandidateFlags: results[3],
-  };
+interface AutomationItem {
+  entityType: string;
+  entityId: string;
+  entityName: string;
+  reason: string;
 }
 
-// Rule 1: Create follow-up tasks for companies/candidates with outreach_status = 'follow_up'
-async function createFollowUpTasks(): Promise<number> {
-  const supabase = await createClient();
-  let created = 0;
+interface RuleResult {
+  ruleName: string;
+  ruleDescription: string;
+  found: number;
+  created: number;
+  items: AutomationItem[];
+}
 
-  // Get companies needing follow-up
-  const { data: companies } = await supabase
+export interface AutomationRunResult {
+  id?: string;
+  dryRun: boolean;
+  rules: RuleResult[];
+  totalFound: number;
+  totalCreated: number;
+  startedAt: string;
+  completedAt: string;
+}
+
+export async function runAutomations(dryRun: boolean = false): Promise<AutomationRunResult> {
+  const supabase = await createClient();
+  const user = await getCurrentUser();
+  const startedAt = new Date().toISOString();
+
+  const rules: RuleResult[] = [];
+
+  // Rule 1: Follow-up Tasks
+  rules.push(await runFollowUpTasksRule(supabase, dryRun, user?.id));
+
+  // Rule 2: Stale Submission Reminders
+  rules.push(await runStaleSubmissionsRule(supabase, dryRun, user?.id));
+
+  // Rule 3: Stale Jobs
+  rules.push(await runStaleJobsRule(supabase, dryRun, user?.id));
+
+  // Rule 4: Stale Candidates
+  rules.push(await runStaleCandidatesRule(supabase, dryRun, user?.id));
+
+  const totalFound = rules.reduce((sum, r) => sum + r.found, 0);
+  const totalCreated = rules.reduce((sum, r) => sum + r.created, 0);
+  const completedAt = new Date().toISOString();
+
+  // Store run history
+  let runId: string | undefined;
+  try {
+    const { data } = await supabase.from("automation_runs").insert({
+      run_by: user?.id ?? null,
+      started_at: startedAt,
+      completed_at: completedAt,
+      dry_run: dryRun,
+      results: { rules },
+      total_found: totalFound,
+      total_created: totalCreated,
+    }).select("id").single();
+    runId = data?.id;
+  } catch {
+    // Non-critical
+  }
+
+  if (!dryRun && totalCreated > 0) {
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+  }
+
+  return { id: runId, dryRun, rules, totalFound, totalCreated, startedAt, completedAt };
+}
+
+async function runFollowUpTasksRule(supabase: ReturnType<typeof Object>, dryRun: boolean, userId?: string): Promise<RuleResult> {
+  // Cast supabase properly - it's the return of createClient()
+  const sb = supabase as Awaited<ReturnType<typeof createClient>>;
+  const items: AutomationItem[] = [];
+
+  // Companies needing follow-up
+  const { data: companies } = await sb
     .from("companies")
-    .select("id, name, follow_up_date, owner_id")
+    .select("id, name")
     .eq("outreach_status", "follow_up")
     .not("follow_up_date", "is", null);
 
   for (const company of companies ?? []) {
-    // Check if an open task already exists for this entity
-    const { data: existingTasks } = await supabase
+    // Check if task already exists
+    const { data: existing } = await sb
       .from("tasks")
       .select("id")
       .eq("entity_type", "company")
       .eq("entity_id", company.id)
       .is("completed_at", null)
+      .ilike("title", `%Follow up:%${company.name}%`)
       .limit(1);
 
-    if (!existingTasks || existingTasks.length === 0) {
-      const { error } = await supabase.from("tasks").insert({
-        title: `Follow up: ${company.name}`,
-        priority: "medium",
-        due_date: company.follow_up_date,
-        entity_type: "company",
-        entity_id: company.id,
-        owner_id: company.owner_id,
+    if (!existing || existing.length === 0) {
+      items.push({
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        reason: "Outreach status is follow_up with follow-up date set",
       });
-      if (!error) created++;
+
+      if (!dryRun) {
+        await sb.from("tasks").insert({
+          title: `Follow up: ${company.name}`,
+          entity_type: "company",
+          entity_id: company.id,
+          priority: "medium",
+          owner_id: userId ?? null,
+        });
+      }
     }
   }
 
-  // Get candidates needing follow-up
-  const { data: candidates } = await supabase
+  // Candidates needing follow-up
+  const { data: candidates } = await sb
     .from("candidates")
-    .select("id, full_name, follow_up_date, owner_id")
+    .select("id, full_name")
     .eq("outreach_status", "follow_up")
     .not("follow_up_date", "is", null);
 
-  for (const candidate of candidates ?? []) {
-    const { data: existingTasks } = await supabase
+  for (const cand of candidates ?? []) {
+    const name = cand.full_name;
+    const { data: existing } = await sb
       .from("tasks")
       .select("id")
       .eq("entity_type", "candidate")
-      .eq("entity_id", candidate.id)
+      .eq("entity_id", cand.id)
       .is("completed_at", null)
+      .ilike("title", `%Follow up:%${name}%`)
       .limit(1);
 
-    if (!existingTasks || existingTasks.length === 0) {
-      const { error } = await supabase.from("tasks").insert({
-        title: `Follow up: ${candidate.full_name}`,
-        priority: "medium",
-        due_date: candidate.follow_up_date,
-        entity_type: "candidate",
-        entity_id: candidate.id,
-        owner_id: candidate.owner_id,
+    if (!existing || existing.length === 0) {
+      items.push({
+        entityType: "candidate",
+        entityId: cand.id,
+        entityName: name,
+        reason: "Outreach status is follow_up with follow-up date set",
       });
-      if (!error) created++;
+
+      if (!dryRun) {
+        await sb.from("tasks").insert({
+          title: `Follow up: ${name}`,
+          entity_type: "candidate",
+          entity_id: cand.id,
+          priority: "medium",
+          owner_id: userId ?? null,
+        });
+      }
     }
   }
 
-  return created;
+  return {
+    ruleName: "follow_up_tasks",
+    ruleDescription: "Create follow-up tasks for companies and candidates with follow-up outreach status",
+    found: items.length,
+    created: dryRun ? 0 : items.length,
+    items,
+  };
 }
 
-// Rule 2: Create reminders for submissions in client_review for > 5 days
-async function createStaleSubmissionReminders(): Promise<number> {
-  const supabase = await createClient();
-  let created = 0;
+async function runStaleSubmissionsRule(supabase: ReturnType<typeof Object>, dryRun: boolean, userId?: string): Promise<RuleResult> {
+  const sb = supabase as Awaited<ReturnType<typeof createClient>>;
+  const items: AutomationItem[] = [];
 
   const fiveDaysAgo = new Date();
   fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-  const cutoff = fiveDaysAgo.toISOString();
-  const today = new Date().toISOString().split("T")[0];
 
-  // Get submissions in client_review status
-  const { data: submissions } = await supabase
+  const { data: submissions } = await sb
     .from("candidate_submissions")
-    .select("id, job_id, client_reviewed_at, created_at")
-    .eq("status", "client_review");
+    .select("id, candidates(full_name), jobs(title)")
+    .eq("status", "client_review")
+    .lt("updated_at", fiveDaysAgo.toISOString());
 
   for (const sub of submissions ?? []) {
-    // Use client_reviewed_at if set, otherwise created_at
-    const referenceDate = sub.client_reviewed_at ?? sub.created_at;
-    if (referenceDate > cutoff) continue; // Not stale yet
+    const candidate = sub.candidates as Record<string, string> | null;
+    const job = sub.jobs as Record<string, string> | null;
+    const name = candidate?.full_name ?? "Unknown";
+    const jobTitle = job?.title ?? "Unknown";
 
-    // Check for existing open task with similar title for this job
-    const { data: existingTasks } = await supabase
+    const { data: existing } = await sb
       .from("tasks")
       .select("id")
-      .eq("entity_type", "job")
-      .eq("entity_id", sub.job_id)
+      .eq("entity_type", "submission")
+      .eq("entity_id", sub.id)
       .is("completed_at", null)
-      .ilike("title", "%submission awaiting client review%")
+      .ilike("title", "%awaiting client review%")
       .limit(1);
 
-    if (!existingTasks || existingTasks.length === 0) {
-      const { error } = await supabase.from("tasks").insert({
-        title: "Follow up on submission awaiting client review",
-        priority: "high",
-        due_date: today,
-        entity_type: "job",
-        entity_id: sub.job_id,
+    if (!existing || existing.length === 0) {
+      items.push({
+        entityType: "submission",
+        entityId: sub.id,
+        entityName: `${name} → ${jobTitle}`,
+        reason: "Submission in client_review for over 5 days",
       });
-      if (!error) created++;
+
+      if (!dryRun) {
+        await sb.from("tasks").insert({
+          title: `Follow up on submission awaiting client review: ${name} for ${jobTitle}`,
+          entity_type: "submission",
+          entity_id: sub.id,
+          priority: "high",
+          owner_id: userId ?? null,
+        });
+      }
     }
   }
 
-  return created;
+  return {
+    ruleName: "stale_submissions",
+    ruleDescription: "Create reminders for submissions stuck in client review for over 5 days",
+    found: items.length,
+    created: dryRun ? 0 : items.length,
+    items,
+  };
 }
 
-// Rule 3: Flag open jobs with no submissions after 30 days
-async function flagStaleJobs(): Promise<number> {
-  const supabase = await createClient();
-  let created = 0;
+async function runStaleJobsRule(supabase: ReturnType<typeof Object>, dryRun: boolean, userId?: string): Promise<RuleResult> {
+  const sb = supabase as Awaited<ReturnType<typeof createClient>>;
+  const items: AutomationItem[] = [];
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const cutoff = thirtyDaysAgo.toISOString();
 
-  // Get open jobs older than 30 days
-  const { data: jobs } = await supabase
+  const { data: jobs } = await sb
     .from("jobs")
-    .select("id, title, owner_id, created_at")
+    .select("id, title, owner_id")
     .eq("status", "open")
-    .lt("created_at", cutoff);
+    .lt("created_at", thirtyDaysAgo.toISOString());
 
   for (const job of jobs ?? []) {
-    // Check if job has any submissions
-    const { data: submissions } = await supabase
+    const { count } = await sb
       .from("candidate_submissions")
-      .select("id")
-      .eq("job_id", job.id)
-      .limit(1);
+      .select("id", { count: "exact", head: true })
+      .eq("job_id", job.id);
 
-    if (submissions && submissions.length > 0) continue; // Has submissions
+    if ((count ?? 0) === 0) {
+      const { data: existing } = await sb
+        .from("tasks")
+        .select("id")
+        .eq("entity_type", "job")
+        .eq("entity_id", job.id)
+        .is("completed_at", null)
+        .ilike("title", "%Stale job%")
+        .limit(1);
 
-    // Check for existing duplicate task
-    const { data: existingTasks } = await supabase
-      .from("tasks")
-      .select("id")
-      .eq("entity_type", "job")
-      .eq("entity_id", job.id)
-      .is("completed_at", null)
-      .ilike("title", "%stale job%")
-      .limit(1);
+      if (!existing || existing.length === 0) {
+        items.push({
+          entityType: "job",
+          entityId: job.id,
+          entityName: job.title,
+          reason: "Open job with no submissions after 30 days",
+        });
 
-    if (!existingTasks || existingTasks.length === 0) {
-      const { error } = await supabase.from("tasks").insert({
-        title: `Stale job: ${job.title} - no submissions after 30 days`,
-        priority: "medium",
-        entity_type: "job",
-        entity_id: job.id,
-        owner_id: job.owner_id,
-      });
-      if (!error) created++;
+        if (!dryRun) {
+          await sb.from("tasks").insert({
+            title: `Stale job: ${job.title} - no submissions after 30 days`,
+            entity_type: "job",
+            entity_id: job.id,
+            priority: "medium",
+            owner_id: job.owner_id ?? userId ?? null,
+          });
+        }
+      }
     }
   }
 
-  return created;
+  return {
+    ruleName: "stale_jobs",
+    ruleDescription: "Flag open jobs with no submissions after 30 days",
+    found: items.length,
+    created: dryRun ? 0 : items.length,
+    items,
+  };
 }
 
-// Rule 4: Flag candidates with no recent contact
-async function flagStaleCandidates(): Promise<number> {
-  const supabase = await createClient();
-  let created = 0;
+async function runStaleCandidatesRule(supabase: ReturnType<typeof Object>, dryRun: boolean, userId?: string): Promise<RuleResult> {
+  const sb = supabase as Awaited<ReturnType<typeof createClient>>;
+  const items: AutomationItem[] = [];
 
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-  const cutoff = fourteenDaysAgo.toISOString();
 
-  // Get candidates with status "new" or "contacted" where last_contacted_at is null or old
-  const { data: candidatesNullContact } = await supabase
+  const { data: candidates } = await sb
     .from("candidates")
-    .select("id, full_name, owner_id")
+    .select("id, full_name, last_contacted_at")
     .in("status", ["new", "contacted"])
-    .is("last_contacted_at", null);
+    .or(`last_contacted_at.is.null,last_contacted_at.lt.${fourteenDaysAgo.toISOString()}`);
 
-  const { data: candidatesOldContact } = await supabase
-    .from("candidates")
-    .select("id, full_name, owner_id")
-    .in("status", ["new", "contacted"])
-    .lt("last_contacted_at", cutoff);
+  for (const cand of candidates ?? []) {
+    const name = cand.full_name;
 
-  const allCandidates = [
-    ...(candidatesNullContact ?? []),
-    ...(candidatesOldContact ?? []),
-  ];
-
-  for (const candidate of allCandidates) {
-    // Check for existing duplicate task
-    const { data: existingTasks } = await supabase
+    const { data: existing } = await sb
       .from("tasks")
       .select("id")
       .eq("entity_type", "candidate")
-      .eq("entity_id", candidate.id)
+      .eq("entity_id", cand.id)
       .is("completed_at", null)
-      .ilike("title", "%stale candidate%")
+      .ilike("title", "%Stale candidate%")
       .limit(1);
 
-    if (!existingTasks || existingTasks.length === 0) {
-      const { error } = await supabase.from("tasks").insert({
-        title: `Stale candidate: ${candidate.full_name} - no recent contact`,
-        priority: "low",
-        entity_type: "candidate",
-        entity_id: candidate.id,
-        owner_id: candidate.owner_id,
+    if (!existing || existing.length === 0) {
+      items.push({
+        entityType: "candidate",
+        entityId: cand.id,
+        entityName: name,
+        reason: cand.last_contacted_at
+          ? "No contact in over 14 days"
+          : "Never contacted",
       });
-      if (!error) created++;
+
+      if (!dryRun) {
+        await sb.from("tasks").insert({
+          title: `Stale candidate: ${name} - no recent contact`,
+          entity_type: "candidate",
+          entity_id: cand.id,
+          priority: "low",
+          owner_id: userId ?? null,
+        });
+      }
     }
   }
 
-  return created;
+  return {
+    ruleName: "stale_candidates",
+    ruleDescription: "Flag candidates with status new/contacted and no contact in 14 days",
+    found: items.length,
+    created: dryRun ? 0 : items.length,
+    items,
+  };
+}
+
+// Get run history
+export async function getAutomationHistory(limit: number = 20): Promise<Array<{
+  id: string;
+  run_by: string | null;
+  started_at: string;
+  completed_at: string | null;
+  dry_run: boolean;
+  results: { rules: RuleResult[] } | null;
+  total_found: number;
+  total_created: number;
+}>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("automation_runs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return (data ?? []) as Array<{
+    id: string;
+    run_by: string | null;
+    started_at: string;
+    completed_at: string | null;
+    dry_run: boolean;
+    results: { rules: RuleResult[] } | null;
+    total_found: number;
+    total_created: number;
+  }>;
+}
+
+export async function getLastAutomationRun() {
+  const history = await getAutomationHistory(1);
+  return history[0] ?? null;
 }

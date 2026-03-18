@@ -3,6 +3,8 @@ import { getMatchesForCandidate } from "@/actions/matching";
 import { getEntityActivity } from "@/actions/activity";
 import { getSubmissionsForCandidate } from "@/actions/submissions";
 import { getTasks, createTask, completeTask } from "@/actions/tasks";
+import { HealthBadge } from "@/components/health-badge";
+import { getCandidateHealth } from "@/actions/data-quality";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, Badge } from "@/components/ui/badge";
@@ -95,10 +97,15 @@ export default async function CandidateDetailPage({
 
   return (
     <>
-      <PageHeader
-        title={candidate.full_name}
-        description={candidate.location ?? undefined}
-      />
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <PageHeader
+            title={candidate.full_name}
+            description={candidate.location ?? undefined}
+          />
+        </div>
+        <HealthBadge fetchHealth={() => getCandidateHealth(candidate.id)} showDetails={true} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">

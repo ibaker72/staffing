@@ -4,6 +4,8 @@ import { getEntityActivity } from "@/actions/activity";
 import { getTasks, createTask, completeTask } from "@/actions/tasks";
 import { getActiveToken, generatePortalToken } from "@/actions/portal";
 import { inviteClient, getInvitationsForCompany } from "@/actions/auth";
+import { HealthBadge } from "@/components/health-badge";
+import { getCompanyHealth } from "@/actions/data-quality";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
@@ -100,11 +102,16 @@ export default async function CompanyDetailPage({
 
   return (
     <>
-      <PageHeader
-        title={company.name}
-        description={company.industry ?? undefined}
-        action={<LinkButton href={`/jobs/new?company_id=${id}`}>Create Job</LinkButton>}
-      />
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <PageHeader
+            title={company.name}
+            description={company.industry ?? undefined}
+            action={<LinkButton href={`/jobs/new?company_id=${id}`}>Create Job</LinkButton>}
+          />
+        </div>
+        <HealthBadge fetchHealth={() => getCompanyHealth(company.id)} showDetails={true} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">
