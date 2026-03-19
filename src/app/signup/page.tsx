@@ -1,23 +1,17 @@
-"use client";
-
-import { useState } from "react";
+import type { Metadata } from "next";
 import { signUp } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export default function SignUpPage() {
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+export const metadata: Metadata = { title: "Sign Up" };
 
-  async function handleSubmit(formData: FormData) {
-    setError(null);
-    setLoading(true);
-    const result = await signUp(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    }
-  }
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const errorParam = params.error;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
@@ -34,7 +28,23 @@ export default function SignUpPage() {
           <p className="text-sm text-zinc-500 mt-1">Create a recruiter account</p>
         </div>
 
-        <form action={handleSubmit} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
+        {errorParam === "missing_fields" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Please complete all required fields.
+          </div>
+        )}
+        {errorParam === "signup_failed" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Could not create your account. Please verify details and try again.
+          </div>
+        )}
+        {errorParam === "auth_unavailable" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Authentication service is temporarily unavailable. Please try again.
+          </div>
+        )}
+
+        <form action={signUp} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Full Name</label>
             <input
@@ -69,11 +79,7 @@ export default function SignUpPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account…" : "Create Account"}
-          </Button>
+          <Button type="submit" className="w-full">Create Account</Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-zinc-500">

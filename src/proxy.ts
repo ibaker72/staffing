@@ -6,6 +6,14 @@ const publicRoutes = ["/login", "/signup", "/invite/accept", "/portal", "/market
 // Routes only accessible to internal users (admin, recruiter)
 const internalRoutes = ["/dashboard", "/companies", "/candidates", "/jobs", "/placements", "/tasks", "/admin", "/settings", "/views", "/reporting", "/import"];
 
+function normalizeSupabaseUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl) return null;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+    return rawUrl;
+  }
+  return `https://${rawUrl}`;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
@@ -20,7 +28,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {

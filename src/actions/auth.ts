@@ -21,6 +21,11 @@ function loginErrorUrl(error: string, redirectTo: string | null): string {
   return `/login?${params.toString()}`;
 }
 
+function signupErrorUrl(error: string): string {
+  const params = new URLSearchParams({ error });
+  return `/signup?${params.toString()}`;
+}
+
 export async function signIn(formData: FormData) {
   const email = (formData.get("email") as string) ?? "";
   const password = (formData.get("password") as string) ?? "";
@@ -82,24 +87,41 @@ export async function signIn(formData: FormData) {
 }
 
 export async function signUp(formData: FormData) {
-  const supabase = await createClient();
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const fullName = formData.get("full_name") as string;
+  const email = (formData.get("email") as string) ?? "";
+  const password = (formData.get("password") as string) ?? "";
+  const fullName = (formData.get("full_name") as string) ?? "";
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        role: "recruiter", // Default for self-signup
+  if (!email || !password || !fullName) {
+    redirect(signupErrorUrl("missing_fields"));
+  }
+
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    console.error("[signUp] Failed to create Supabase client", error);
+    redirect(signupErrorUrl("auth_unavailable"));
+  }
+
+  try {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: "recruiter", // Default for self-signup
+        },
       },
-    },
-  });
+    });
 
-  if (error) {
-    return { error: error.message };
+    if (error) {
+      console.error("[signUp] signUp failed", error.message);
+      redirect(signupErrorUrl("signup_failed"));
+    }
+  } catch (error) {
+    console.error("[signUp] signUp threw", error);
+    redirect(signupErrorUrl("auth_unavailable"));
   }
 
   redirect("/login?message=Check your email to confirm your account");
