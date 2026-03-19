@@ -76,6 +76,18 @@ export async function proxy(request: NextRequest) {
     }
   );
 
+  // Helper: create a redirect that preserves session cookies from supabaseResponse.
+  // This is CRITICAL — after getUser() refreshes the session, the old token is
+  // invalidated. If we return a plain NextResponse.redirect(), the refreshed
+  // cookies are lost and the next request fails with a stale session.
+  function redirectWithCookies(url: URL): NextResponse {
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value);
+    });
+    return response;
+  }
+
   // Refresh session — IMPORTANT: must call getUser() not getSession()
   // Wrap in try/catch so network errors don't throw into the catch-all
   let user = null;
@@ -106,7 +118,7 @@ export async function proxy(request: NextRequest) {
         return null;
       }
       if (data) {
-        return data as { role: string; is_active: boolean } | null;
+        return data as { role: string; is_active: boolean };
       }
 
       const inferredRole = inferSafeRoleFromMetadata(currentUser.user_metadata);
@@ -145,20 +157,15 @@ export async function proxy(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.pathname = "/login";
         url.searchParams.set("error", "profile_missing");
-        return NextResponse.redirect(url);
-      }
-      if (profile.role === "client") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/client";
-        return NextResponse.redirect(url);
+        return redirectWithCookies(url);
       }
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      url.pathname = profile.role === "client" ? "/client" : "/dashboard";
+      return redirectWithCookies(url);
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   // Public routes: allow unauthenticated access
@@ -167,11 +174,13 @@ export async function proxy(request: NextRequest) {
     if (pathname === "/login" && user) {
       const profile = await getProfile(user);
       if (!profile) {
+        // Profile is missing but user is authenticated — let them see the login page
+        // so they can see the error and try again. Don't redirect in a loop.
         return supabaseResponse;
       }
       const url = request.nextUrl.clone();
       url.pathname = profile.role === "client" ? "/client" : "/dashboard";
-      return NextResponse.redirect(url);
+      return redirectWithCookies(url);
     }
     return supabaseResponse;
   }
@@ -181,20 +190,18 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   // Fetch profile once for all remaining checks
   const profile = await getProfile(user);
 
   // If we couldn't fetch the profile at all (DB error or missing record),
-  // fail closed — redirect to login rather than allowing unverified access
+  // degrade gracefully for the user rather than hard-redirecting to login
+  // which creates a loop. Allow through and let the page-level auth handle it.
   if (!profile) {
-    console.error(`Proxy: no profile found for user ${user.id}, redirecting to login`);
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("error", "profile_missing");
-    return NextResponse.redirect(url);
+    console.error(`Proxy: no profile found for user ${user.id}, allowing through to page-level auth`);
+    return supabaseResponse;
   }
 
   // Check if account is active
@@ -202,7 +209,7 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("error", "account_disabled");
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   // Check if route requires internal access
@@ -210,14 +217,14 @@ export async function proxy(request: NextRequest) {
   if (isInternalRoute && profile.role === "client") {
     const url = request.nextUrl.clone();
     url.pathname = "/client";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   // Admin routes
   if (pathname.startsWith("/admin") && profile.role !== "admin") {
     const url = request.nextUrl.clone();
     url.pathname = "/unauthorized";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   return supabaseResponse;

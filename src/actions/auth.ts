@@ -38,87 +38,112 @@ export async function signIn(formData: FormData) {
   const rawRedirect = (formData.get("redirect") as string) || null;
   const redirectTo = sanitizeRedirect(rawRedirect);
 
-  let supabase;
-  try {
-    supabase = await createClient();
-  } catch (error) {
-    console.error("[signIn] Failed to create Supabase client", error);
-    redirect(loginErrorUrl("auth_unavailable", redirectTo));
-  }
-
   if (!email || !password) {
     redirect(loginErrorUrl("invalid_credentials", redirectTo));
   }
 
-  let signInError: string | null = null;
+  // Create Supabase client — redirect() must stay OUTSIDE try/catch
+  // because Next.js redirect() throws a special error that try/catch would swallow.
+  let supabase;
+  let clientCreateFailed = false;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    console.error("[signIn] Failed to create Supabase client", error);
+    clientCreateFailed = true;
+  }
+  if (clientCreateFailed || !supabase) {
+    redirect(loginErrorUrl("auth_unavailable", redirectTo));
+  }
+
+  // Authenticate
+  let signInFailed = false;
+  let signInErrorMsg: string | null = null;
   try {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    signInError = error?.message ?? null;
+    if (error) {
+      signInFailed = true;
+      signInErrorMsg = error.message;
+    }
   } catch (error) {
     console.error("[signIn] signInWithPassword threw", error);
-    redirect(loginErrorUrl("auth_unavailable", redirectTo));
+    signInFailed = true;
+  }
+  if (signInFailed) {
+    // Distinguish between bad credentials and service errors
+    const isCredentialError = signInErrorMsg?.toLowerCase().includes("invalid") ||
+      signInErrorMsg?.toLowerCase().includes("credentials") ||
+      signInErrorMsg?.toLowerCase().includes("password");
+    redirect(loginErrorUrl(isCredentialError || !signInErrorMsg ? "invalid_credentials" : "auth_unavailable", redirectTo));
   }
 
-  if (signInError) {
-    redirect(loginErrorUrl("invalid_credentials", redirectTo));
-  }
-
-  // Get role to determine redirect
+  // Fetch authenticated user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError) {
-    console.error("[signIn] Failed to fetch current user", userError.message);
+  if (userError || !user) {
+    console.error("[signIn] Failed to fetch current user after login", userError?.message);
     redirect(loginErrorUrl("auth_unavailable", redirectTo));
   }
 
-  if (user) {
-    let profile: { role?: string } | null = null;
-    try {
-      const { data } = await supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
+  // Fetch profile — errors tracked via variables, redirect() stays outside try/catch
+  let profile: { role?: string } | null = null;
+  let profileError = false;
+  try {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (error) {
+      console.error("[signIn] Profile query error", error.message);
+      profileError = true;
+    } else {
       profile = data as { role?: string } | null;
-    } catch (error) {
-      console.error("[signIn] Profile lookup failed", error);
-      redirect(loginErrorUrl("profile_missing", redirectTo));
     }
+  } catch (error) {
+    console.error("[signIn] Profile lookup threw", error);
+    profileError = true;
+  }
 
-    if (!profile) {
-      try {
-        const inferredRole = inferSafeRoleFromMetadata(user.user_metadata);
-        const { data: inserted, error: insertError } = await supabase
-          .from("user_profiles")
-          .upsert(
-            {
-              id: user.id,
-              email: user.email ?? "",
-              full_name: (user.user_metadata as { full_name?: string } | null)?.full_name ?? "",
-              role: inferredRole,
-              is_active: true,
-            },
-            { onConflict: "id" }
-          )
-          .select("role")
-          .maybeSingle();
+  // Self-heal missing profile
+  if (!profile && !profileError) {
+    const inferredRole = inferSafeRoleFromMetadata(user.user_metadata);
+    try {
+      const { data: inserted, error: insertError } = await supabase
+        .from("user_profiles")
+        .upsert(
+          {
+            id: user.id,
+            email: user.email ?? "",
+            full_name: (user.user_metadata as { full_name?: string } | null)?.full_name ?? "",
+            role: inferredRole,
+            is_active: true,
+          },
+          { onConflict: "id" }
+        )
+        .select("role")
+        .maybeSingle();
 
-        if (insertError) {
-          console.error("[signIn] Failed to self-heal missing profile", insertError.message);
-          redirect(loginErrorUrl("profile_missing", redirectTo));
-        }
-
+      if (insertError) {
+        console.error("[signIn] Failed to self-heal missing profile", insertError.message);
+        profileError = true;
+      } else {
         profile = inserted as { role?: string } | null;
-      } catch (error) {
-        console.error("[signIn] Profile self-heal threw", error);
-        redirect(loginErrorUrl("profile_missing", redirectTo));
       }
-    }
-
-    if (profile?.role === "client") {
-      redirect(redirectTo || "/client");
+    } catch (error) {
+      console.error("[signIn] Profile self-heal threw", error);
+      profileError = true;
     }
   }
 
+  // If we still have no profile after self-heal, redirect with clear error
+  if (!profile) {
+    return redirect(loginErrorUrl("profile_missing", redirectTo));
+  }
+
+  // Role-based redirect
+  if (profile.role === "client") {
+    return redirect(redirectTo || "/client");
+  }
   redirect(redirectTo || "/dashboard");
 }
 
@@ -132,13 +157,19 @@ export async function signUp(formData: FormData) {
   }
 
   let supabase;
+  let clientCreateFailed = false;
   try {
     supabase = await createClient();
   } catch (error) {
     console.error("[signUp] Failed to create Supabase client", error);
+    clientCreateFailed = true;
+  }
+  if (clientCreateFailed || !supabase) {
     redirect(signupErrorUrl("auth_unavailable"));
   }
 
+  let signUpFailed = false;
+  let signUpErrorMsg = "";
   try {
     const { error } = await supabase.auth.signUp({
       email,
@@ -153,11 +184,20 @@ export async function signUp(formData: FormData) {
 
     if (error) {
       console.error("[signUp] signUp failed", error.message);
-      redirect(signupErrorUrl("signup_failed"));
+      signUpFailed = true;
+      signUpErrorMsg = error.message;
     }
   } catch (error) {
     console.error("[signUp] signUp threw", error);
-    redirect(signupErrorUrl("auth_unavailable"));
+    signUpFailed = true;
+  }
+
+  if (signUpFailed) {
+    // If error mentions "already registered", give a clearer message
+    const errorCode = signUpErrorMsg.toLowerCase().includes("already")
+      ? "already_registered"
+      : "signup_failed";
+    redirect(signupErrorUrl(errorCode));
   }
 
   redirect("/login?message=Check your email to confirm your account");
@@ -206,25 +246,19 @@ export async function acceptClientInvitation(token: string, formData: FormData) 
   }
 
   if (authData.user) {
-    // Link client to company
-    const { error: linkError } = await supabase.from("client_users").insert({
-      user_id: authData.user.id,
-      company_id: invitation.company_id,
-      invited_by: invitation.invited_by,
+    // Use SECURITY DEFINER function to atomically link client to company
+    // and mark invitation accepted. This bypasses RLS safely since the
+    // newly created client user doesn't have INSERT access to client_users.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: acceptError } = await (supabase.rpc as any)("accept_invitation", {
+      p_user_id: authData.user.id,
+      p_invitation_id: invitation.id,
+      p_company_id: invitation.company_id,
+      p_invited_by: invitation.invited_by,
     });
-    if (linkError) {
-      console.error("[acceptClientInvitation] Failed to link client to company:", linkError.message);
-      return { error: "Account created but failed to link to company. Contact support." };
-    }
-
-    // Mark invitation as accepted
-    const { error: acceptError } = await supabase
-      .from("client_invitations")
-      .update({ accepted_at: new Date().toISOString() })
-      .eq("id", invitation.id);
     if (acceptError) {
-      console.error("[acceptClientInvitation] Failed to mark invitation accepted:", acceptError.message);
-      // Non-fatal — account and link were created successfully
+      console.error("[acceptClientInvitation] Failed to link client to company:", acceptError.message);
+      return { error: "Account created but failed to link to company. Contact support." };
     }
   }
 

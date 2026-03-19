@@ -38,6 +38,11 @@ export default async function SignUpPage({
             Could not create your account. Please verify details and try again.
           </div>
         )}
+        {errorParam === "already_registered" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            An account with this email already exists. Try signing in instead.
+          </div>
+        )}
         {errorParam === "auth_unavailable" && (
           <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             Authentication service is temporarily unavailable. Please try again.
