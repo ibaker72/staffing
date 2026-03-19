@@ -62,6 +62,11 @@ function LoginContent() {
             Your account has been disabled. Contact an administrator.
           </div>
         )}
+        {errorParam === "server_config" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            The server is not configured correctly. Check that Supabase environment variables are set.
+          </div>
+        )}
 
         <form action={handleSubmit} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
           <div>
