@@ -1,8 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getJobs, type JobFilters } from "@/actions/jobs";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/button";
 import { ExportButton } from "@/components/export-button";
+
+export const metadata: Metadata = { title: "Jobs" };
 import { exportJobs } from "@/actions/export";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";

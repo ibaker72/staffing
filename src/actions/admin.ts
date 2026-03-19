@@ -347,6 +347,51 @@ export async function seedDemoData() {
   };
 }
 
+export async function resetDemoData(): Promise<{
+  deleted: { companies: number; candidates: number; jobs: number; tasks: number; placements: number; submissions: number };
+}> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  // Delete in dependency order (submissions before jobs/candidates, placements before jobs)
+  // Activity events and audit log are preserved for traceability
+  const tables = [
+    "candidate_submissions",
+    "placements",
+    "tasks",
+    "jobs",
+    "candidates",
+    "companies",
+  ] as const;
+
+  const deleted: Record<string, number> = {};
+
+  for (const table of tables) {
+    const { data } = await supabase.from(table).select("id");
+    const count = data?.length ?? 0;
+
+    if (count > 0) {
+      const ids = data!.map((r: { id: string }) => r.id);
+      await supabase.from(table).delete().in("id", ids);
+    }
+
+    deleted[table === "candidate_submissions" ? "submissions" : table] = count;
+  }
+
+  revalidatePath("/", "layout");
+
+  return {
+    deleted: {
+      companies: deleted.companies ?? 0,
+      candidates: deleted.candidates ?? 0,
+      jobs: deleted.jobs ?? 0,
+      tasks: deleted.tasks ?? 0,
+      placements: deleted.placements ?? 0,
+      submissions: deleted.submissions ?? 0,
+    },
+  };
+}
+
 export async function getRecentAuditLog(limit: number = 30) {
   await requireAdmin();
   const supabase = await createClient();

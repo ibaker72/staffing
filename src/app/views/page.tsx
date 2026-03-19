@@ -1,8 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, PriorityBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+
+export const metadata: Metadata = { title: "Saved Views" };
 import { RunAutomationsButton } from "@/components/run-automations-button";
 import {
   getOverdueTasksView,

@@ -15,7 +15,7 @@ export interface EmailPayload {
   from?: string;
 }
 
-const FROM_DEFAULT = process.env.EMAIL_FROM ?? "Staffing Engine <noreply@staffingengine.app>";
+const FROM_DEFAULT = process.env.EMAIL_FROM ?? "Bedrock Staffing <noreply@bedrockstaffing.com>";
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 

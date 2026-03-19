@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getPlacements, type PlacementFilters } from "@/actions/placements";
 import { getCompanies } from "@/actions/companies";
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata: Metadata = { title: "Placements" };
 import { Card } from "@/components/ui/card";
 import { LinkButton } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";

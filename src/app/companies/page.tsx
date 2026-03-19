@@ -1,8 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getCompanies, type CompanyFilters } from "@/actions/companies";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/button";
 import { ExportButton } from "@/components/export-button";
+
+export const metadata: Metadata = { title: "Companies" };
 import { exportCompanies } from "@/actions/export";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";

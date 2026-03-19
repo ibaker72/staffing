@@ -1,0 +1,16 @@
+{
+  "name": "Bedrock Staffing",
+  "short_name": "Bedrock",
+  "description": "Staffing and recruiting management platform",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#18181b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

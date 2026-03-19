@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
+
+export const metadata: Metadata = { title: "Reports" };
 import {
   getAverageTimeToFill,
   getConversionRates,
