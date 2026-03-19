@@ -36,6 +36,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  try {
+
   // Create a response we can modify
   let supabaseResponse = NextResponse.next({ request });
 
@@ -167,6 +169,18 @@ export async function proxy(request: NextRequest) {
   }
 
   return supabaseResponse;
+  } catch (error) {
+    console.error("Proxy runtime failure", error);
+
+    if (isPublicRoute) {
+      return NextResponse.next();
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "auth_unavailable");
+    return NextResponse.redirect(url);
+  }
 }
 
 export const config = {
