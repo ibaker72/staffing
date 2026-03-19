@@ -26,6 +26,12 @@ function signupErrorUrl(error: string): string {
   return `/signup?${params.toString()}`;
 }
 
+function inferSafeRoleFromMetadata(meta: unknown): "client" | "recruiter" {
+  if (!meta || typeof meta !== "object") return "recruiter";
+  const maybeRole = (meta as { role?: unknown }).role;
+  return maybeRole === "client" ? "client" : "recruiter";
+}
+
 export async function signIn(formData: FormData) {
   const email = (formData.get("email") as string) ?? "";
   const password = (formData.get("password") as string) ?? "";
@@ -76,6 +82,36 @@ export async function signIn(formData: FormData) {
     } catch (error) {
       console.error("[signIn] Profile lookup failed", error);
       redirect(loginErrorUrl("profile_missing", redirectTo));
+    }
+
+    if (!profile) {
+      try {
+        const inferredRole = inferSafeRoleFromMetadata(user.user_metadata);
+        const { data: inserted, error: insertError } = await supabase
+          .from("user_profiles")
+          .upsert(
+            {
+              id: user.id,
+              email: user.email ?? "",
+              full_name: (user.user_metadata as { full_name?: string } | null)?.full_name ?? "",
+              role: inferredRole,
+              is_active: true,
+            },
+            { onConflict: "id" }
+          )
+          .select("role")
+          .maybeSingle();
+
+        if (insertError) {
+          console.error("[signIn] Failed to self-heal missing profile", insertError.message);
+          redirect(loginErrorUrl("profile_missing", redirectTo));
+        }
+
+        profile = inserted as { role?: string } | null;
+      } catch (error) {
+        console.error("[signIn] Profile self-heal threw", error);
+        redirect(loginErrorUrl("profile_missing", redirectTo));
+      }
     }
 
     if (profile?.role === "client") {

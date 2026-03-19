@@ -14,6 +14,12 @@ function normalizeSupabaseUrl(rawUrl: string | undefined): string | null {
   return `https://${rawUrl}`;
 }
 
+function inferSafeRoleFromMetadata(meta: unknown): "client" | "recruiter" {
+  if (!meta || typeof meta !== "object") return "recruiter";
+  const maybeRole = (meta as { role?: unknown }).role;
+  return maybeRole === "client" ? "client" : "recruiter";
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
@@ -84,18 +90,47 @@ export async function proxy(request: NextRequest) {
   }
 
   // Helper: safely fetch a user profile without throwing
-  async function getProfile(userId: string) {
+  async function getProfile(currentUser: {
+    id: string;
+    email?: string | null;
+    user_metadata?: unknown;
+  }) {
     try {
       const { data, error } = await supabase
         .from("user_profiles")
         .select("role, is_active")
-        .eq("id", userId)
+        .eq("id", currentUser.id)
         .maybeSingle();
       if (error) {
         console.error("Proxy: profile query error", error.message);
         return null;
       }
-      return data as { role: string; is_active: boolean } | null;
+      if (data) {
+        return data as { role: string; is_active: boolean } | null;
+      }
+
+      const inferredRole = inferSafeRoleFromMetadata(currentUser.user_metadata);
+      const { data: inserted, error: insertError } = await supabase
+        .from("user_profiles")
+        .upsert(
+          {
+            id: currentUser.id,
+            email: currentUser.email ?? "",
+            full_name: (currentUser.user_metadata as { full_name?: string } | null)?.full_name ?? "",
+            role: inferredRole,
+            is_active: true,
+          },
+          { onConflict: "id" }
+        )
+        .select("role, is_active")
+        .maybeSingle();
+
+      if (insertError) {
+        console.error("Proxy: profile self-heal failed", insertError.message);
+        return null;
+      }
+
+      return inserted as { role: string; is_active: boolean } | null;
     } catch (e) {
       console.error("Proxy: profile query threw", e);
       return null;
@@ -105,7 +140,7 @@ export async function proxy(request: NextRequest) {
   // Root redirect
   if (pathname === "/") {
     if (user) {
-      const profile = await getProfile(user.id);
+      const profile = await getProfile(user);
       if (!profile) {
         const url = request.nextUrl.clone();
         url.pathname = "/login";
@@ -130,7 +165,7 @@ export async function proxy(request: NextRequest) {
   if (isPublicRoute) {
     // If logged in and trying to access /login, redirect away
     if (pathname === "/login" && user) {
-      const profile = await getProfile(user.id);
+      const profile = await getProfile(user);
       if (!profile) {
         return supabaseResponse;
       }
@@ -150,7 +185,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Fetch profile once for all remaining checks
-  const profile = await getProfile(user.id);
+  const profile = await getProfile(user);
 
   // If we couldn't fetch the profile at all (DB error or missing record),
   // fail closed — redirect to login rather than allowing unverified access
