@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getCandidates, type CandidateFilters } from "@/actions/candidates";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/button";
+import { ExportButton } from "@/components/export-button";
+import { exportCandidates } from "@/actions/export";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";
 import { CandidateListWithBulk } from "@/components/candidate-list-bulk";
@@ -30,7 +32,7 @@ export default async function CandidatesPage({
       <PageHeader
         title="Candidates"
         description="Manage your candidate pipeline"
-        action={<LinkButton href="/candidates/new">Add Candidate</LinkButton>}
+        action={<div className="flex items-center gap-2"><ExportButton label="Export" fileName="candidates.csv" exportAction={exportCandidates} /><LinkButton href="/candidates/new">Add Candidate</LinkButton></div>}
       />
 
       <Suspense>

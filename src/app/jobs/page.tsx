@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getJobs, type JobFilters } from "@/actions/jobs";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/button";
+import { ExportButton } from "@/components/export-button";
+import { exportJobs } from "@/actions/export";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";
 import { JobListWithBulk } from "@/components/job-list-bulk";
@@ -30,7 +32,7 @@ export default async function JobsPage({
       <PageHeader
         title="Jobs"
         description="Open roles across your client companies"
-        action={<LinkButton href="/jobs/new">Create Job</LinkButton>}
+        action={<div className="flex items-center gap-2"><ExportButton label="Export" fileName="jobs.csv" exportAction={exportJobs} /><LinkButton href="/jobs/new">Create Job</LinkButton></div>}
       />
 
       <Suspense>

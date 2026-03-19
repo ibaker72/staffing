@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getCompanies, type CompanyFilters } from "@/actions/companies";
 import { PageHeader } from "@/components/ui/page-header";
 import { LinkButton } from "@/components/ui/button";
+import { ExportButton } from "@/components/export-button";
+import { exportCompanies } from "@/actions/export";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchBar, FilterSelect, SortSelect } from "@/components/ui/search-filters";
 import { CompanyListWithBulk } from "@/components/company-list-bulk";
@@ -29,7 +31,7 @@ export default async function CompaniesPage({
       <PageHeader
         title="Companies"
         description="Manage your client companies"
-        action={<LinkButton href="/companies/new">Add Company</LinkButton>}
+        action={<div className="flex items-center gap-2"><ExportButton label="Export" fileName="companies.csv" exportAction={exportCompanies} /><LinkButton href="/companies/new">Add Company</LinkButton></div>}
       />
 
       <Suspense>

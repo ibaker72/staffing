@@ -10,6 +10,8 @@ import {
   importCandidates,
   importJobs,
 } from "@/actions/import";
+import { TemplateDownloadButton } from "@/components/export-button";
+import { getCompanyTemplate, getCandidateTemplate, getJobTemplate } from "@/actions/export";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -303,6 +305,11 @@ export default function ImportPage() {
                 </div>
               </button>
             ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            <TemplateDownloadButton label="Company Template" fileName="companies_template.csv" templateAction={getCompanyTemplate} />
+            <TemplateDownloadButton label="Candidate Template" fileName="candidates_template.csv" templateAction={getCandidateTemplate} />
+            <TemplateDownloadButton label="Job Template" fileName="jobs_template.csv" templateAction={getJobTemplate} />
           </div>
           <div className="flex justify-end">
             <button

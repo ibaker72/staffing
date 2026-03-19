@@ -125,6 +125,49 @@ export interface ActivityEvent {
   metadata: Record<string, unknown>;
   user_id: string | null;
   created_at: string;
+  actor_id?: string | null;
+  actor_email?: string | null;
+  previous_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+  entity_name?: string | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  previous_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AutomationRun {
+  id: string;
+  run_by: string | null;
+  started_at: string;
+  completed_at: string | null;
+  dry_run: boolean;
+  results: Record<string, unknown> | null;
+  total_found: number;
+  total_created: number;
+  created_at: string;
+}
+
+export interface ImportLog {
+  id: string;
+  entity_type: string;
+  file_name: string | null;
+  total_rows: number;
+  imported_count: number;
+  error_count: number;
+  errors: Array<{ row: number; message: string }> | null;
+  duplicate_count: number;
+  imported_by: string | null;
+  created_at: string;
 }
 
 export interface CandidateSubmission {
@@ -549,6 +592,12 @@ export interface Database {
           metadata: Record<string, unknown>;
           user_id: string | null;
           created_at: string;
+          actor_id: string | null;
+          actor_email: string | null;
+          previous_value: Record<string, unknown> | null;
+          new_value: Record<string, unknown> | null;
+          ip_address: string | null;
+          entity_name: string | null;
         };
         Insert: {
           id?: string;
@@ -559,6 +608,12 @@ export interface Database {
           metadata?: Record<string, unknown>;
           user_id?: string | null;
           created_at?: string;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          previous_value?: Record<string, unknown> | null;
+          new_value?: Record<string, unknown> | null;
+          ip_address?: string | null;
+          entity_name?: string | null;
         };
         Update: {
           id?: string;
@@ -569,6 +624,12 @@ export interface Database {
           metadata?: Record<string, unknown>;
           user_id?: string | null;
           created_at?: string;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          previous_value?: Record<string, unknown> | null;
+          new_value?: Record<string, unknown> | null;
+          ip_address?: string | null;
+          entity_name?: string | null;
         };
         Relationships: [];
       };
@@ -702,6 +763,128 @@ export interface Database {
             columns: ["company_id"];
             isOneToOne: false;
             referencedRelation: "companies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      audit_log: {
+        Row: {
+          id: string;
+          actor_id: string | null;
+          actor_email: string | null;
+          entity_type: string;
+          entity_id: string | null;
+          action: string;
+          previous_value: Record<string, unknown> | null;
+          new_value: Record<string, unknown> | null;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          entity_type: string;
+          entity_id?: string | null;
+          action: string;
+          previous_value?: Record<string, unknown> | null;
+          new_value?: Record<string, unknown> | null;
+          metadata?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          entity_type?: string;
+          entity_id?: string | null;
+          action?: string;
+          previous_value?: Record<string, unknown> | null;
+          new_value?: Record<string, unknown> | null;
+          metadata?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      automation_runs: {
+        Row: {
+          id: string;
+          run_by: string | null;
+          started_at: string;
+          completed_at: string | null;
+          dry_run: boolean;
+          results: Record<string, unknown> | null;
+          total_found: number;
+          total_created: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          run_by?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+          dry_run?: boolean;
+          results?: Record<string, unknown> | null;
+          total_found?: number;
+          total_created?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          run_by?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+          dry_run?: boolean;
+          results?: Record<string, unknown> | null;
+          total_found?: number;
+          total_created?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      import_logs: {
+        Row: {
+          id: string;
+          entity_type: string;
+          file_name: string | null;
+          total_rows: number;
+          imported_count: number;
+          error_count: number;
+          errors: Array<{ row: number; message: string }> | null;
+          duplicate_count: number;
+          imported_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_type: string;
+          file_name?: string | null;
+          total_rows?: number;
+          imported_count?: number;
+          error_count?: number;
+          errors?: Array<{ row: number; message: string }> | null;
+          duplicate_count?: number;
+          imported_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_type?: string;
+          file_name?: string | null;
+          total_rows?: number;
+          imported_count?: number;
+          error_count?: number;
+          errors?: Array<{ row: number; message: string }> | null;
+          duplicate_count?: number;
+          imported_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_imported_by_fkey";
+            columns: ["imported_by"];
+            isOneToOne: false;
+            referencedRelation: "user_profiles";
             referencedColumns: ["id"];
           },
         ];
