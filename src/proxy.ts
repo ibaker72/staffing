@@ -133,11 +133,14 @@ export async function proxy(request: NextRequest) {
   // Fetch profile once for all remaining checks
   const profile = await getProfile(user.id);
 
-  // If we couldn't fetch the profile at all (DB error), let the request through
-  // rather than locking the user out — the page-level auth will handle it
+  // If we couldn't fetch the profile at all (DB error or missing record),
+  // fail closed — redirect to login rather than allowing unverified access
   if (!profile) {
-    console.error(`Proxy: no profile found for user ${user.id}, allowing through`);
-    return supabaseResponse;
+    console.error(`Proxy: no profile found for user ${user.id}, redirecting to login`);
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "profile_missing");
+    return NextResponse.redirect(url);
   }
 
   // Check if account is active

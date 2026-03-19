@@ -6,11 +6,19 @@ import { redirect } from "next/navigation";
 import type { ClientInvitation } from "@/types/database";
 import { notifyClientInvitation } from "./notifications";
 
+function sanitizeRedirect(url: string | null): string | null {
+  if (!url) return null;
+  // Only allow relative paths, prevent open redirect via protocol-relative URLs
+  if (!url.startsWith("/") || url.startsWith("//")) return null;
+  return url;
+}
+
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const redirectTo = (formData.get("redirect") as string) || null;
+  const rawRedirect = (formData.get("redirect") as string) || null;
+  const redirectTo = sanitizeRedirect(rawRedirect);
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -103,17 +111,25 @@ export async function acceptClientInvitation(token: string, formData: FormData) 
 
   if (authData.user) {
     // Link client to company
-    await supabase.from("client_users").insert({
+    const { error: linkError } = await supabase.from("client_users").insert({
       user_id: authData.user.id,
       company_id: invitation.company_id,
       invited_by: invitation.invited_by,
     });
+    if (linkError) {
+      console.error("[acceptClientInvitation] Failed to link client to company:", linkError.message);
+      return { error: "Account created but failed to link to company. Contact support." };
+    }
 
     // Mark invitation as accepted
-    await supabase
+    const { error: acceptError } = await supabase
       .from("client_invitations")
       .update({ accepted_at: new Date().toISOString() })
       .eq("id", invitation.id);
+    if (acceptError) {
+      console.error("[acceptClientInvitation] Failed to mark invitation accepted:", acceptError.message);
+      // Non-fatal — account and link were created successfully
+    }
   }
 
   redirect("/login?message=Account created. Please check your email to confirm, then sign in.");
@@ -123,6 +139,16 @@ export async function inviteClient(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+
+  // Verify the user has an internal role (admin or recruiter)
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile || (profile.role !== "admin" && profile.role !== "recruiter")) {
+    throw new Error("Only internal users can invite clients.");
+  }
 
   const email = formData.get("email") as string;
   const companyId = formData.get("company_id") as string;

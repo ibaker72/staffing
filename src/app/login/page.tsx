@@ -67,6 +67,11 @@ function LoginContent() {
             The server is not configured correctly. Check that Supabase environment variables are set.
           </div>
         )}
+        {errorParam === "profile_missing" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Your user profile could not be loaded. Please try again or contact an administrator.
+          </div>
+        )}
 
         <form action={handleSubmit} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
           <div>

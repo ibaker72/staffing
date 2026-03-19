@@ -1,10 +1,8 @@
-import { getCurrentUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireAuth } from "@/lib/auth";
 import { ClientNav } from "@/components/client-nav";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireAuth();
 
   return (
     <div className="min-h-screen bg-zinc-50">
