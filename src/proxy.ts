@@ -2,9 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Routes that don't require authentication
-const publicRoutes = ["/login", "/signup", "/invite/accept", "/portal"];
+const publicRoutes = ["/login", "/signup", "/invite/accept", "/portal", "/marketing"];
 // Routes only accessible to internal users (admin, recruiter)
-const internalRoutes = ["/dashboard", "/companies", "/candidates", "/jobs", "/placements", "/tasks", "/admin"];
+const internalRoutes = ["/dashboard", "/companies", "/candidates", "/jobs", "/placements", "/tasks", "/admin", "/settings", "/views", "/reporting", "/import"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -14,7 +14,8 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json"
   ) {
     return NextResponse.next();
   }
@@ -24,13 +25,6 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing Supabase environment variables in proxy");
-
-    if (pathname === "/") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("error", "server_config");
-      return NextResponse.redirect(url);
-    }
 
     if (isPublicRoute) {
       return NextResponse.next();
@@ -42,153 +36,134 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  try {
-    // Create a response we can modify
-    let supabaseResponse = NextResponse.next({ request });
+  // Create a response we can modify
+  let supabaseResponse = NextResponse.next({ request });
 
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-            supabaseResponse = NextResponse.next({ request });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            );
-          },
+  const supabase = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
         },
-      }
-    );
-
-    // Refresh session — IMPORTANT: must call getUser() not getSession()
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Root redirect
-    if (pathname === "/") {
-      if (user) {
-        // Check role to redirect appropriately
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (profile?.role === "client") {
-          const url = request.nextUrl.clone();
-          url.pathname = "/client";
-          return NextResponse.redirect(url);
-        }
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
-      }
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
     }
+  );
 
-    // Public routes: allow unauthenticated access
-    if (isPublicRoute) {
-      // If logged in and trying to access /login, redirect away
-      if (pathname === "/login" && user) {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        const url = request.nextUrl.clone();
-        url.pathname = profile?.role === "client" ? "/client" : "/dashboard";
-        return NextResponse.redirect(url);
-      }
-      return supabaseResponse;
+  // Refresh session — IMPORTANT: must call getUser() not getSession()
+  // Wrap in try/catch so network errors don't throw into the catch-all
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
     }
+  } catch (e) {
+    console.error("Proxy: getUser() threw", e);
+    // user stays null — treat as unauthenticated
+  }
 
-    // All other routes require authentication
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(url);
-    }
-
-    // Check if route requires internal access
-    const isInternalRoute = internalRoutes.some((route) => pathname.startsWith(route));
-    if (isInternalRoute) {
-      const { data: profile } = await supabase
+  // Helper: safely fetch a user profile without throwing
+  async function getProfile(userId: string) {
+    try {
+      const { data, error } = await supabase
         .from("user_profiles")
         .select("role, is_active")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
-
-      if (!profile?.is_active) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        url.searchParams.set("error", "account_disabled");
-        return NextResponse.redirect(url);
+      if (error) {
+        console.error("Proxy: profile query error", error.message);
+        return null;
       }
+      return data as { role: string; is_active: boolean } | null;
+    } catch (e) {
+      console.error("Proxy: profile query threw", e);
+      return null;
+    }
+  }
 
+  // Root redirect
+  if (pathname === "/") {
+    if (user) {
+      const profile = await getProfile(user.id);
       if (profile?.role === "client") {
         const url = request.nextUrl.clone();
         url.pathname = "/client";
         return NextResponse.redirect(url);
       }
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
     }
-
-    // Client-only routes
-    if (pathname.startsWith("/client")) {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("role, is_active")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!profile?.is_active) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        url.searchParams.set("error", "account_disabled");
-        return NextResponse.redirect(url);
-      }
-
-      // Internal users can also access client views (for admin/testing)
-      // No additional restriction needed
-    }
-
-    // Admin routes
-    if (pathname.startsWith("/admin")) {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profile?.role !== "admin") {
-        const url = request.nextUrl.clone();
-        url.pathname = "/unauthorized";
-        return NextResponse.redirect(url);
-      }
-    }
-
-    return supabaseResponse;
-  } catch (error) {
-    console.error("Proxy auth check failed", error);
-
-    if (isPublicRoute || pathname === "/") {
-      return NextResponse.next();
-    }
-
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("error", "auth_unavailable");
     return NextResponse.redirect(url);
   }
+
+  // Public routes: allow unauthenticated access
+  if (isPublicRoute) {
+    // If logged in and trying to access /login, redirect away
+    if (pathname === "/login" && user) {
+      const profile = await getProfile(user.id);
+      const url = request.nextUrl.clone();
+      url.pathname = profile?.role === "client" ? "/client" : "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
+
+  // All other routes require authentication
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // Fetch profile once for all remaining checks
+  const profile = await getProfile(user.id);
+
+  // If we couldn't fetch the profile at all (DB error), let the request through
+  // rather than locking the user out — the page-level auth will handle it
+  if (!profile) {
+    console.error(`Proxy: no profile found for user ${user.id}, allowing through`);
+    return supabaseResponse;
+  }
+
+  // Check if account is active
+  if (!profile.is_active) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("error", "account_disabled");
+    return NextResponse.redirect(url);
+  }
+
+  // Check if route requires internal access
+  const isInternalRoute = internalRoutes.some((route) => pathname.startsWith(route));
+  if (isInternalRoute && profile.role === "client") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/client";
+    return NextResponse.redirect(url);
+  }
+
+  // Admin routes
+  if (pathname.startsWith("/admin") && profile.role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/unauthorized";
+    return NextResponse.redirect(url);
+  }
+
+  return supabaseResponse;
 }
 
 export const config = {
