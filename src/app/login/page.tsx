@@ -1,40 +1,26 @@
-"use client";
-
-import { useState, Suspense } from "react";
+import type { Metadata } from "next";
 import { signIn } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-sm text-zinc-500">Loading...</p>
-      </div>
-    }>
-      <LoginContent />
-    </Suspense>
-  );
-}
+export const metadata: Metadata = { title: "Login" };
 
-function LoginContent() {
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
-  const message = searchParams.get("message");
-  const errorParam = searchParams.get("error");
-  const redirectTo = searchParams.get("redirect");
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const message = params.message;
+  const errorParam = params.error;
+  const redirectTo = params.redirect;
 
-  async function handleSubmit(formData: FormData) {
-    setError(null);
-    setLoading(true);
-    if (redirectTo) formData.set("redirect", redirectTo);
-    const result = await signIn(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
+  async function signInWithRedirect(formData: FormData) {
+    "use server";
+    if (redirectTo) {
+      formData.set("redirect", redirectTo);
     }
+    await signIn(formData);
   }
 
   return (
@@ -72,8 +58,18 @@ function LoginContent() {
             Your user profile could not be loaded. Please try again or contact an administrator.
           </div>
         )}
+        {errorParam === "invalid_credentials" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Invalid email or password.
+          </div>
+        )}
+        {errorParam === "auth_unavailable" && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            Authentication service is temporarily unavailable. Please try again.
+          </div>
+        )}
 
-        <form action={handleSubmit} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
+        <form action={signInWithRedirect} className="space-y-4 bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
             <input
@@ -97,11 +93,7 @@ function LoginContent() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
-          </Button>
+          <Button type="submit" className="w-full">Sign In</Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-zinc-500">

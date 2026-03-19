@@ -13,27 +13,65 @@ function sanitizeRedirect(url: string | null): string | null {
   return url;
 }
 
+function loginErrorUrl(error: string, redirectTo: string | null): string {
+  const params = new URLSearchParams({ error });
+  if (redirectTo) {
+    params.set("redirect", redirectTo);
+  }
+  return `/login?${params.toString()}`;
+}
+
 export async function signIn(formData: FormData) {
-  const supabase = await createClient();
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const email = (formData.get("email") as string) ?? "";
+  const password = (formData.get("password") as string) ?? "";
   const rawRedirect = (formData.get("redirect") as string) || null;
   const redirectTo = sanitizeRedirect(rawRedirect);
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    console.error("[signIn] Failed to create Supabase client", error);
+    redirect(loginErrorUrl("auth_unavailable", redirectTo));
+  }
 
-  if (error) {
-    return { error: error.message };
+  if (!email || !password) {
+    redirect(loginErrorUrl("invalid_credentials", redirectTo));
+  }
+
+  let signInError: string | null = null;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    signInError = error?.message ?? null;
+  } catch (error) {
+    console.error("[signIn] signInWithPassword threw", error);
+    redirect(loginErrorUrl("auth_unavailable", redirectTo));
+  }
+
+  if (signInError) {
+    redirect(loginErrorUrl("invalid_credentials", redirectTo));
   }
 
   // Get role to determine redirect
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    console.error("[signIn] Failed to fetch current user", userError.message);
+    redirect(loginErrorUrl("auth_unavailable", redirectTo));
+  }
+
   if (user) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+    let profile: { role?: string } | null = null;
+    try {
+      const { data } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = data as { role?: string } | null;
+    } catch (error) {
+      console.error("[signIn] Profile lookup failed", error);
+      redirect(loginErrorUrl("profile_missing", redirectTo));
+    }
 
     if (profile?.role === "client") {
       redirect(redirectTo || "/client");
