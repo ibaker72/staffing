@@ -26,7 +26,14 @@ export default async function PortalPage({
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <Card className="max-w-md w-full text-center">
-          <h1 className="text-lg font-bold text-zinc-900 mb-2">Client Portal</h1>
+          <div className="flex justify-center mb-3">
+            <svg viewBox="0 0 32 32" fill="none" className="h-8 w-8">
+              <rect x="4" y="20" width="24" height="5" rx="1.5" fill="#18181b"/>
+              <rect x="7" y="14" width="18" height="5" rx="1.5" fill="#3f3f46"/>
+              <rect x="10" y="8" width="12" height="5" rx="1.5" fill="#71717a"/>
+            </svg>
+          </div>
+          <h1 className="text-lg font-bold text-zinc-900 mb-2">Bedrock Staffing</h1>
           <p className="text-sm text-zinc-500 mb-3">A valid portal link is required to access this page.</p>
           <p className="text-xs text-zinc-400">
             Have an account? <a href="/login" className="text-zinc-700 underline">Sign in</a> for full access.
@@ -63,9 +70,16 @@ export default async function PortalPage({
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-4">
-          <h1 className="text-lg font-bold text-zinc-900">{session.companyName}</h1>
-          <p className="text-sm text-zinc-500">Client Portal</p>
+        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center gap-3">
+          <svg viewBox="0 0 32 32" fill="none" className="h-7 w-7 shrink-0">
+            <rect x="4" y="20" width="24" height="5" rx="1.5" fill="#18181b"/>
+            <rect x="7" y="14" width="18" height="5" rx="1.5" fill="#3f3f46"/>
+            <rect x="10" y="8" width="12" height="5" rx="1.5" fill="#71717a"/>
+          </svg>
+          <div>
+            <h1 className="text-lg font-bold text-zinc-900">{session.companyName}</h1>
+            <p className="text-sm text-zinc-500">Bedrock Staffing &middot; Client Portal</p>
+          </div>
         </div>
       </div>
 

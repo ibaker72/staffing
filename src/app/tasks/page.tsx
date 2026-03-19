@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { getTasks, createTask, completeTask, reopenTask, deleteTask } from "@/actions/tasks";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+
+export const metadata: Metadata = { title: "Tasks" };
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import type { TaskPriority } from "@/types/database";

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Card } from "@/components/ui/card";
@@ -17,7 +18,15 @@ import { getCurrentUser } from "@/lib/auth";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
+export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function DashboardPage() {
   const currentUser = await getCurrentUser();
@@ -117,11 +126,14 @@ export default async function DashboardPage() {
 
   const submissionStatuses = ["internal_review", "submitted", "client_review", "interview", "offer", "hired", "rejected"] as const;
 
+  const greeting = getGreeting();
+  const firstName = currentUser?.profile.full_name?.split(" ")[0];
+
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Overview of your staffing operations"
+        title={firstName ? `${greeting}, ${firstName}` : greeting}
+        description="Here's what's happening across your staffing pipeline"
       />
 
       {/* Onboarding checklist for new users */}

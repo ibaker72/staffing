@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = { title: "Admin" };
 import { revalidatePath } from "next/cache";
 import {
   getSystemDiagnostics,
@@ -11,7 +14,7 @@ import {
   getAutomationHistory,
 } from "@/actions/admin";
 import { RunAutomationsButton } from "@/components/run-automations-button";
-import { SeedButton } from "@/components/seed-button";
+import { SeedButton, ResetButton } from "@/components/seed-button";
 import type { UserProfile, UserRole } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -807,11 +810,24 @@ async function QualityTab() {
 
 function SeedTab() {
   return (
-    <Card>
-      <h3 className="mb-4 text-sm font-semibold text-zinc-900">
-        Seed Demo Data
-      </h3>
-      <SeedButton />
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <h3 className="mb-4 text-sm font-semibold text-zinc-900">
+          Seed Demo Data
+        </h3>
+        <SeedButton />
+      </Card>
+
+      <Card>
+        <h3 className="mb-4 text-sm font-semibold text-zinc-900">
+          Demo Reset
+        </h3>
+        <p className="text-xs text-zinc-500 mb-4">
+          Use this to clear all operational data and start fresh. Useful before demos or when resetting a sandbox environment.
+          You can re-seed demo data after resetting.
+        </p>
+        <ResetButton />
+      </Card>
+    </div>
   );
 }
