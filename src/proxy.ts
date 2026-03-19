@@ -106,7 +106,13 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/") {
     if (user) {
       const profile = await getProfile(user.id);
-      if (profile?.role === "client") {
+      if (!profile) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/login";
+        url.searchParams.set("error", "profile_missing");
+        return NextResponse.redirect(url);
+      }
+      if (profile.role === "client") {
         const url = request.nextUrl.clone();
         url.pathname = "/client";
         return NextResponse.redirect(url);
@@ -125,8 +131,11 @@ export async function proxy(request: NextRequest) {
     // If logged in and trying to access /login, redirect away
     if (pathname === "/login" && user) {
       const profile = await getProfile(user.id);
+      if (!profile) {
+        return supabaseResponse;
+      }
       const url = request.nextUrl.clone();
-      url.pathname = profile?.role === "client" ? "/client" : "/dashboard";
+      url.pathname = profile.role === "client" ? "/client" : "/dashboard";
       return NextResponse.redirect(url);
     }
     return supabaseResponse;
