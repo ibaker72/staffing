@@ -59,6 +59,18 @@ export default async function ClientDashboard() {
   async function handleFeedback(submissionId: string, status: SubmissionStatus, feedback: string | null) {
     "use server";
     const innerSupabase = await createClient();
+
+    // Verify this submission belongs to the client's company
+    const { data: sub } = await innerSupabase
+      .from("candidate_submissions")
+      .select("id, job:jobs!inner(company_id)")
+      .eq("id", submissionId)
+      .maybeSingle();
+    const jobCompanyId = (sub?.job as { company_id?: string } | null)?.company_id;
+    if (!sub || !companyIds.includes(jobCompanyId ?? "")) {
+      throw new Error("Submission not found or access denied.");
+    }
+
     const updateData: Record<string, unknown> = { client_feedback: feedback };
     if (status === "client_review" || status === "interview" || status === "rejected") {
       updateData.status = status;

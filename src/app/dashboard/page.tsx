@@ -14,7 +14,7 @@ import { getTotalRevenueMetric, getPlacementStatusBreakdown } from "@/actions/pl
 import { getRecentActivity } from "@/actions/activity";
 import { getPlacementsThisMonth, getRevenueByCompany, getSubmissionFunnelCounts, getActiveSubmissionsCount, getOpenTasksCount, getMyStaleJobs, getMyFollowUpsDue, getSubmissionAging, getDataHygieneWarnings } from "@/actions/reporting";
 import { getOverdueTasks, getMyTasks } from "@/actions/tasks";
-import { getCurrentUser } from "@/lib/auth";
+import { requireInternal } from "@/lib/auth";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import type { MetricQueryResult } from "@/lib/supabase/metric-query";
 
@@ -29,7 +29,7 @@ function getGreeting(): string {
 }
 
 export default async function DashboardPage() {
-  const currentUser = await getCurrentUser();
+  const currentUser = await requireInternal();
   const [
     settledMetrics,
     candidateBreakdown,
@@ -108,18 +108,18 @@ export default async function DashboardPage() {
 
   // Merge follow-ups into a single sorted list
   const allFollowUps = [
-    ...companyFollowUps.map((c) => ({
+    ...companyFollowUps.filter((c) => c.follow_up_date).map((c) => ({
       id: c.id,
       name: c.name,
       type: "company" as const,
-      date: c.follow_up_date!,
+      date: c.follow_up_date as string,
       href: `/companies/${c.id}`,
     })),
-    ...candidateFollowUps.map((c) => ({
+    ...candidateFollowUps.filter((c) => c.follow_up_date).map((c) => ({
       id: c.id,
       name: c.full_name,
       type: "candidate" as const,
-      date: c.follow_up_date!,
+      date: c.follow_up_date as string,
       href: `/candidates/${c.id}`,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
